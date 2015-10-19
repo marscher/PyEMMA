@@ -142,23 +142,18 @@ def timescales_msm(dtrajs, lags=None, nits=None, reversible=True, connected=True
     References
     ----------
     Implied timescales as a lagtime-selection and MSM-validation approach were
-    suggested in [1]_. Error estimation is done either using moving block
-    bootstrapping [2]_ or a Bayesian analysis using Metropolis-Hastings Monte
+    suggested in :cite:`swope_describing_2004`.
+    Error estimation is done either using moving block bootstrapping :cite:`kunsch_jackknife_1989`
+    or a Bayesian analysis using Metropolis-Hastings Monte
     Carlo sampling of the posterior. Nonreversible Bayesian sampling is done
     by independently sampling Dirichtlet distributions of the transition matrix
     rows. A Monte Carlo method for sampling reversible MSMs was introduced
-    in [3]_. Here we employ a much more efficient algorithm introduced in [4]_.
+    in :cite:`noe_probability_2008`. Here we employ a much more efficient
+    algorithm introduced in :cite:`trendelkamp_schroer_estimation_2015`.
 
-    .. [1] Swope, W. C. and J. W. Pitera and F. Suits: Describing protein
-        folding kinetics by molecular dynamics simulations: 1. Theory.
-        J. Phys. Chem. B 108: 6571-6581 (2004)
-    .. [2] Kuensch, H. R.: The jackknife and the bootstrap for general
-        stationary observations. Ann. Stat. 17, 1217-1241 (1989)
-    .. [3] Noe, F.: Probability Distributions of Molecular Observables computed
-        from Markov Models. J. Chem. Phys. 128, 244103 (2008)
-    .. [4] Trendelkamp-Schroer, B, H. Wu, F. Paul and F. Noe:
-        Estimation and uncertainty of reversible Markov models.
-        http://arxiv.org/abs/1507.05990
+    .. bibliography:: /refs.bib
+       :cited:
+       :style: plain
 
     """
     # format data
@@ -398,7 +393,7 @@ def estimate_markov_model(dtrajs, lag, reversible=True, statdist=None,
     References
     ----------
     The mathematical theory of Markov (state) model estimation was introduced
-    in [1]_. Further theoretical developments were made in [2]_. The term
+    in [1]_. Further theoretical developments were made in :cite:`swope_describing_2004`. The term
     Markov state model was coined in [3]_. Continuous-time Markov models
     (Master equation models) were suggested in [4]_. Reversible Markov model
     estimation was introduced in [5]_, and further developed in [6]_,[7]_,[9]_.
@@ -410,6 +405,10 @@ def estimate_markov_model(dtrajs, lag, reversible=True, statdist=None,
     methodological improvements and gives a good overview of the methodological
     basics of Markov state modeling today. [10]_ is a more extensive review
     book of theory, methods and applications.
+
+    .. bibliography::
+       :cited:
+       :style: plain
 
     .. [1] Schuette, C. , A. Fischer, W. Huisinga and P. Deuflhard:
         A Direct Approach to Conformational Dynamics based on Hybrid Monte
