@@ -154,6 +154,7 @@ def timescales_msm(dtrajs, lags=None, nits=None, reversible=True, connected=True
     .. bibliography:: /refs.bib
        :cited:
        :style: plain
+       :filter: docname in docnames
 
     """
     # format data
@@ -409,6 +410,7 @@ def estimate_markov_model(dtrajs, lag, reversible=True, statdist=None,
     .. bibliography::
        :cited:
        :style: plain
+       :filter: docname in docnames
 
     .. [1] Schuette, C. , A. Fischer, W. Huisinga and P. Deuflhard:
         A Direct Approach to Conformational Dynamics based on Hybrid Monte
