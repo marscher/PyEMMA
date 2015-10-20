@@ -20,7 +20,8 @@ r"""User API for the pyemma.msm package
 
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import as _
+
 from .estimators import MaximumLikelihoodHMSM as _ML_HMSM
 from .estimators import BayesianMSM as _Bayes_MSM
 from .estimators import BayesianHMSM as _Bayes_HMSM
@@ -29,7 +30,7 @@ from .estimators import ImpliedTimescales as _ImpliedTimescales
 
 from msmtools.flux import tpt as tpt_factory
 from .models import MSM
-from pyemma.util.annotators import shortcut
+from pyemma.util.annotators import shortcut as _shortcut
 from pyemma.util import types as _types
 
 __docformat__ = "restructuredtext en"
@@ -54,10 +55,9 @@ __all__ = ['markov_model',
 # =============================================================================
 
 
-@shortcut('its')
+@_shortcut('its')
 def timescales_msm(dtrajs, lags=None, nits=None, reversible=True, connected=True,
                    errors=None, nsamples=50, n_jobs=1, show_progress=True):
-    # format data
     r""" Implied timescales from Markov state models estimated at a series of lag times.
 
     Parameters
@@ -152,10 +152,9 @@ def timescales_msm(dtrajs, lags=None, nits=None, reversible=True, connected=True
     algorithm introduced in :cite:`trendelkamp_schroer_estimation_2015`.
 
     .. bibliography:: /refs.bib
-       :cited:
        :style: plain
-       :filter: docname in docnames
-
+       :labelprefix: A
+       :keyprefix: a-
     """
     # format data
     dtrajs = _types.ensure_dtraj_list(dtrajs)
@@ -407,10 +406,10 @@ def estimate_markov_model(dtrajs, lag, reversible=True, statdist=None,
     basics of Markov state modeling today. [10]_ is a more extensive review
     book of theory, methods and applications.
 
-    .. bibliography::
-       :cited:
+    .. bibliography:: /refs.bib
        :style: plain
-       :filter: docname in docnames
+       :labelprefix: est_msm
+       :keyprefix: estmsm-
 
     .. [1] Schuette, C. , A. Fischer, W. Huisinga and P. Deuflhard:
         A Direct Approach to Conformational Dynamics based on Hybrid Monte
