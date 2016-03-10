@@ -29,7 +29,7 @@ from .estimators import MaximumLikelihoodMSM as _ML_MSM
 from .estimators import ImpliedTimescales as _ImpliedTimescales
 
 from msmtools.flux import tpt as tpt_factory
-from .models import MSM
+from .models import MSM as _MSM
 from pyemma.util.annotators import shortcut as _shortcut
 from pyemma.util import types as _types
 
@@ -260,7 +260,7 @@ def markov_model(P, dt_model='1 step'):
 
 
     """
-    return MSM(P, dt_model=dt_model)
+    return _MSM(P, dt_model=dt_model)
 
 
 def estimate_markov_model(dtrajs, lag, reversible=True, statdist=None,
