@@ -117,6 +117,8 @@ class TRAM(_Estimator, _MEMM, _ProgressReporter):
         in press
 
     """
+    _serialize_version = 0
+
     def __init__(
         self, lag, count_mode='sliding',
         connectivity='summed_count_matrix',

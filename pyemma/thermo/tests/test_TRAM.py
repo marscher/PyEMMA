@@ -313,6 +313,23 @@ class TestTRAMwithTRAMmodel(unittest.TestCase):
             test_fel = -np.log(counts) + np.log(counts.sum())
             assert np.allclose(reference_fel, test_fel, atol=0.1)
 
+    def test_serialization(self):
+        # run TRAM
+        tram = pyemma.thermo.TRAM(lag=1, maxerr=1E-12, save_convergence_info=10,
+                                  direct_space=True, nn=None, init='mbar')
+        tram.estimate(self.tramtrajs)
+
+        import tempfile, os
+        _, fn = tempfile.mkstemp()
+        try:
+            tram.save(fn)
+            restored = pyemma.load(fn)
+
+            self.assertEqual(tram, restored)
+
+        finally:
+            os.unlink(fn)
+
 if __name__ == "__main__":
     unittest.main()
 
