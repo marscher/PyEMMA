@@ -1,65 +1,94 @@
+import os
+from collections import defaultdict
+
 import h5py
+
 from pyemma._base.logging import Loggable
+from pyemma._base.progress import ProgressReporter
 from pyemma.coordinates.data._base.datasource import DataSource
 from pyemma.coordinates.data.data_in_memory import DataInMemoryIterator
+from pyemma.util.units import bytes_to_string
 
 
-class _CacheFileWrapper(Loggable):
-    def __init__(self, data_producer, name):
+class _CacheFile(Loggable, ProgressReporter):
+    def __init__(self, cache, name):
         """
         Parameters
         ----------
-        data_producer: DataSource
+        cache: DataSource
 
         file_handle : h5py.File
 
         """
 
         self._name = "pyemma.cache.fwrapper"
-        self.data_producer = data_producer
-        self.file_handle = self._cache_file = h5py.File(name=name, mode='a')
-
+        self.cache = cache
+        self.data_source = cache.data_producer
+        try:
+            self.file_handle = self._cache_file = h5py.File(name=name, mode='a')
+        except:
+            raise
+        self.misses = 0
+        self.hits = defaultdict(int)
         if self.file_handle.items():
             self.validate_cache()
 
     def validate_cache(self):
-        # check shapes
+        # 1. check shapes, remove those which do not match.
+        # 2.
         for i, item in enumerate(self.file_handle.items()):
-            desired = (self.data_producer.data_producer.trajectory_length(i), self.data_producer.ndim)
+            desired = (self.data_source.trajectory_length(i), self.cache.ndim)
             if item[1].shape != desired:
                 self.logger.debug("shape mismatch, removing: {} != {}".format(item[1].shape, desired))
                 del self.file_handle[item[0]]
         self.file_handle.flush()
 
     def _create_cache_itraj(self, itraj):
-        length = self.data_producer.trajectory_length(itraj)
-        ndim = self.data_producer.ndim
+        length = self.data_source.trajectory_length(itraj)
+        ndim = self.data_source.ndim
         try:
-            table = self.file_handle.create_dataset(name=str(itraj),
-                                                    shape=(length, ndim),
-                                                    dtype=self.data_producer.output_type())
+            dataset = self.file_handle.create_dataset(name=str(itraj),
+                                                      shape=(length, ndim),
+                                                      dtype=self.cache.output_type(),
+                                                      chunks=True,
+                                                      )
             self.file_handle.flush()
 
         except:
             raise
-        return table
+        return dataset
 
     def fill_cache(self, table, itraj):
-        # FIXME: this is gets much more than we actual want to assign here
-        # howto solve this for non-random accessible formats?
-        data_itraj = self.data_producer.data_producer.get_output()[itraj]
-        table[:] = data_itraj
+        t = 0
+        with self.data_source.iterator(chunk=self.data_source.chunksize) as it:
+            it.state.itraj = itraj
+            if self.data_source.chunksize:
+                n_chunks_for_itraj = int( self.data_source.trajectory_length(itraj) / self.data_source.chunksize)
+                self._progress_register(n_chunks_for_itraj, description="fill cache for traj={}".format(itraj))
+            for itraj_iter, chunk in it:
+                if itraj_iter != itraj:
+                    break
+                n = len(chunk)
+                table[t:t + n] = chunk[:]
+                t += n
+                if self.data_source.chunksize:
+                    self._progress_update(1)
+
+        if self.data_source.chunksize:
+            self._progress_force_finish()
+
         self.file_handle.flush()
         return table
 
     def __getitem__(self, itraj):
-        self.logger.debug("get itraj: {}".format(itraj))
         try:
             res = self.file_handle[str(itraj)]
-            self.logger.debug("cache hit")
+            self.hits[itraj] += 1
+            self.logger.debug("HIT")
             return res
         except KeyError:
-            self.logger.debug("cache miss")
+            self.logger.debug("MISS")
+            self.misses += 1
             # 1. create table
             table = self._create_cache_itraj(itraj)
 
@@ -68,9 +97,27 @@ class _CacheFileWrapper(Loggable):
 
             return table
 
+    def __repr__(self):
+        size = bytes_to_string(self.file_handle.id.get_filesize())#os.stat(self.file_handle.filename).st_size)
+        return "[CacheFile {fn}: items={n} size={size}]".format(fn=self.file_handle.filename,
+                                                                n=len(self.file_handle),
+                                                                size=size)
+
+    def invalidate(self):
+        """ invalidate the cache file (maybe not throw the data away here...?
+        TODO: provide a setting to keep data"""
+
+        # self._cache_file
+
+        pass
+
+    def __len__(self):
+        return len(self.file_handle)
+
+
 
 class _Cache(DataSource):
-    """ This class caches the output of its data producer, respecting its stride value.
+    """ This class caches the output of its data producer
 
     TODO
     ----
@@ -81,13 +128,20 @@ class _Cache(DataSource):
 
     def __init__(self, data_source, chunksize=1000):
         super(_Cache, self).__init__(chunksize=chunksize)
-        self.data_producer = data_source
 
-        self.data = _CacheFileWrapper(self, self.cache_name)
+        self.data_producer = data_source
+        first_cache_file = _CacheFile(self, self.current_cache_name)
+
+        # provide the data list
+        self._cache_files = {self.current_cache_name: first_cache_file}
 
         self._ndim = self.data_producer.ndim
         self._ntraj = self.data_producer.ntraj
         self._lengths = self.data_producer.trajectory_lengths()
+
+    @property
+    def data(self):
+        return self._cache_files[self.current_cache_name]
 
     @property
     def data_producer(self):
@@ -96,46 +150,38 @@ class _Cache(DataSource):
     @data_producer.setter
     def data_producer(self, val):
         # TODO: this should invalidate the cache!
+        # self.data.invalidate()
         self._data_producer = val
 
     @property
-    def cache_name(self):
+    def current_cache_name(self):
         """ file name of the cache"""
-        # TODO: how to generate proper names automatically?
-        return "{}".format("/tmp/test.h5")
+        src = self.data_producer
+        assert src
+        descriptions = []
+        last_src = None
+        while src != last_src:
+            # TODO: describe not impled everywhere, maybe define a hash method in a super class and use this.
+            descriptions.append(src.describe())
+            last_src = src
+
+        from hashlib import sha256
+        hasher = sha256()
+        inp = str(descriptions).encode()
+        hasher.update(inp)
+        res = hasher.hexdigest()
+        return res + ".h5"
 
     def _create_iterator(self, skip=0, chunk=0, stride=1, return_trajindex=True, cols=None):
         return DataInMemoryIterator(self, skip, chunk, stride, return_trajindex, cols)
 
+    def get_output(self, dimensions=slice(0, None), stride=1, skip=0, chunk=None):
+        res = [traj for traj in self.data]
+        return res
 
-if __name__ == '__main__':
-    import numpy as np
-    import pyemma
-    from glob import glob
-    import os
 
-    test_dir = "/tmp/foo"
+    def __len__(self):
+        return sum(len(f) for f in self._cache_files)
 
-    def create_test_file(force_recreate=False):
-
-        if force_recreate or not os.path.exists(test_dir):
-            print("creating")
-            data = [np.random.random((1000, 12)) for _ in range(10)]
-            os.makedirs(test_dir)
-            os.chdir(test_dir)
-            for i, x in enumerate(data):
-                np.save("{}.npy".format(i), x)
-
-    create_test_file()
-
-    files = glob(test_dir+"/*.npy")
-    print("files", files)
-
-    src = pyemma.coordinates.source(files)
-    data = src.get_output()
-    cache = _Cache(src)
-
-    out = cache.get_output()
-
-    for actual, desired in zip(out, data):
-        np.testing.assert_allclose(actual, desired, atol=1e-15, rtol=1e-6)
+    def __repr__(self):
+        return "[Cache => {}".format(repr(self._cache_files[self.current_cache_name]))
