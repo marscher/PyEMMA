@@ -9,19 +9,17 @@ from pyemma.coordinates.data.cache import _Cache
 
 
 class TestCache(unittest.TestCase):
-    
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
 
-        self.length = 10000
+        self.length = 1000
         self.dim = 3
         data = [np.random.random((self.length, self.dim)) for _ in range(10)]
-        os.chdir(self.test_dir)
+
         for i, x in enumerate(data):
-            np.save("{}.npy".format(i), x)
+            np.save(os.path.join(self.test_dir, "{}.npy".format(i)), x)
 
         self.files = glob(self.test_dir + "/*.npy")
-        #pyemma.config.show_progress_bars = True
 
     def tearDown(self):
         import shutil
@@ -32,7 +30,7 @@ class TestCache(unittest.TestCase):
         src.describe()
         data = src.get_output()
         cache = _Cache(src)
-
+        self.assertEqual(cache.data.misses, 0)
         out = cache.get_output()
         self.assertEqual(cache.data.misses, len(self.files))
 
@@ -44,22 +42,30 @@ class TestCache(unittest.TestCase):
 
         self.assertIn("items={}".format(len(cache)), repr(cache))
 
+    def test_get_output(self):
+        src = pyemma.coordinates.source(self.files, chunk_size=0)
+        dim = 1
+        stride = 2
+        skip = 3
+        desired = src.get_output(stride=stride, dimensions=dim, skip=skip)
+
+        cache = _Cache(src)
+        actual = cache.get_output(stride=stride, dimensions=dim, skip=skip)
+        np.testing.assert_allclose(actual, desired)
+
     def test_with_tica(self):
         src = pyemma.coordinates.source(self.files, chunk_size=0)
         cache = _Cache(src)
         tica_cache_inp = pyemma.coordinates.tica(cache)
-        print(tica_cache_inp.dimension())
 
         tica_without_cache = pyemma.coordinates.tica(src)
 
         np.testing.assert_allclose(tica_cache_inp.cov, tica_without_cache.cov, atol=1e-10)
         np.testing.assert_allclose(tica_cache_inp.cov_tau, tica_without_cache.cov_tau, atol=1e-10)
 
-        np.testing.assert_allclose(tica_cache_inp.eigenvalues, tica_without_cache.eigenvalues, atol=1e-8)
-        np.testing.assert_allclose(tica_cache_inp.eigenvectors, tica_without_cache.eigenvectors, atol=1e-8)
+        np.testing.assert_allclose(tica_cache_inp.eigenvalues, tica_without_cache.eigenvalues, atol=1e-6)
+        np.testing.assert_allclose(tica_cache_inp.eigenvectors, tica_without_cache.eigenvectors, atol=1e-6)
 
 
-    def test_with_tica_withoutcache(self):
-        src = pyemma.coordinates.source(self.files, chunk_size=0)
-        #cache = _Cache(src)
-        tica = pyemma.coordinates.tica(src)
+if __name__ == '__main__':
+    unittest.main()

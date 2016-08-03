@@ -1,12 +1,12 @@
-import os
 from collections import defaultdict
 
 import h5py
-
+import numpy as np
 from pyemma._base.logging import Loggable
 from pyemma._base.progress import ProgressReporter
 from pyemma.coordinates.data._base.datasource import DataSource
 from pyemma.coordinates.data.data_in_memory import DataInMemoryIterator
+from pyemma.util.annotators import fix_docs
 from pyemma.util.units import bytes_to_string
 
 
@@ -16,8 +16,10 @@ class _CacheFile(Loggable, ProgressReporter):
         Parameters
         ----------
         cache: DataSource
+            the associated Cache instance to which this _CacheFile belongs to.
 
-        file_handle : h5py.File
+        name: str
+            file name of the underlying cache file.
 
         """
 
@@ -115,7 +117,7 @@ class _CacheFile(Loggable, ProgressReporter):
         return len(self.file_handle)
 
 
-
+@fix_docs
 class _Cache(DataSource):
     """ This class caches the output of its data producer
 
@@ -176,9 +178,22 @@ class _Cache(DataSource):
         return DataInMemoryIterator(self, skip, chunk, stride, return_trajindex, cols)
 
     def get_output(self, dimensions=slice(0, None), stride=1, skip=0, chunk=None):
-        res = [traj for traj in self.data]
-        return res
+        if isinstance(dimensions, int):
+            ndim = 1
+            dimensions = slice(dimensions, dimensions + 1)
+        elif isinstance(dimensions, (list, np.ndarray, tuple, slice)):
+            if hasattr(dimensions, 'ndim') and dimensions.ndim > 1:
+                raise ValueError('dimension indices can\'t have more than one dimension')
+            ndim = len(np.zeros(self.ndim)[dimensions])
+        else:
+            raise ValueError('unsupported type (%s) of "dimensions"' % type(dimensions))
+        assert ndim > 0, "ndim was zero in %s" % self.__class__.__name__
+        dim_inds = dimensions.indices(1)
+        self.logger.debug("dim slice: {}; dim inds: {}".format(dimensions, dim_inds))
 
+        res = [traj[skip::stride, dimensions] for traj in self.data]
+        assert all(isinstance(o, np.ndarray) for o in res)
+        return res
 
     def __len__(self):
         return sum(len(f) for f in self._cache_files)
