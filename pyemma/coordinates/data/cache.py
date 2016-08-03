@@ -1,11 +1,13 @@
 from collections import defaultdict
-
+import os
 import h5py
 import numpy as np
+
 from pyemma._base.logging import Loggable
 from pyemma._base.progress import ProgressReporter
 from pyemma.coordinates.data._base.datasource import DataSource
 from pyemma.coordinates.data.data_in_memory import DataInMemoryIterator
+from pyemma.util import config
 from pyemma.util.annotators import fix_docs
 from pyemma.util.units import bytes_to_string
 
@@ -26,8 +28,9 @@ class _CacheFile(Loggable, ProgressReporter):
         self._name = "pyemma.cache.fwrapper"
         self.cache = cache
         self.data_source = cache.data_producer
+        self.file_name = os.path.join(config.cache_dir, name)
         try:
-            self.file_handle = self._cache_file = h5py.File(name=name, mode='a')
+            self.file_handle = self._cache_file = h5py.File(name=self.file_name, mode='a')
         except:
             raise
         self.misses = 0
@@ -65,7 +68,7 @@ class _CacheFile(Loggable, ProgressReporter):
         with self.data_source.iterator(chunk=self.data_source.chunksize) as it:
             it.state.itraj = itraj
             if self.data_source.chunksize:
-                n_chunks_for_itraj = int( self.data_source.trajectory_length(itraj) / self.data_source.chunksize)
+                n_chunks_for_itraj = int(self.data_source.trajectory_length(itraj) / self.data_source.chunksize)
                 self._progress_register(n_chunks_for_itraj, description="fill cache for traj={}".format(itraj))
             for itraj_iter, chunk in it:
                 if itraj_iter != itraj:
@@ -100,7 +103,7 @@ class _CacheFile(Loggable, ProgressReporter):
             return table
 
     def __repr__(self):
-        size = bytes_to_string(self.file_handle.id.get_filesize())#os.stat(self.file_handle.filename).st_size)
+        size = bytes_to_string(self.file_handle.id.get_filesize())  # os.stat(self.file_handle.filename).st_size)
         return "[CacheFile {fn}: items={n} size={size}]".format(fn=self.file_handle.filename,
                                                                 n=len(self.file_handle),
                                                                 size=size)
@@ -172,7 +175,8 @@ class _Cache(DataSource):
         inp = str(descriptions).encode()
         hasher.update(inp)
         res = hasher.hexdigest()
-        return res + ".h5"
+        return "{prefix}_{hash}.{suffix}".format(prefix=self._data_producer.__class__.__name__,
+                                                 hash=res, suffix=".h5")
 
     def _create_iterator(self, skip=0, chunk=0, stride=1, return_trajindex=True, cols=None):
         return DataInMemoryIterator(self, skip, chunk, stride, return_trajindex, cols)
