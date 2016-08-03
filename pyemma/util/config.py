@@ -30,12 +30,11 @@ from pyemma.util.exceptions import ConfigDirectoryException
 
 import pkg_resources
 
-
 # for IDE stupidity, just add a new cfg var here, if you add a property to Wrapper
-cfg_dir = default_config_file = default_logging_config = logging_config = \
+cache_dir = cfg_dir = default_config_file = default_logging_config = logging_config = \
     show_progress_bars = used_filenames = use_trajectory_lengths_cache = None
 
-__all__ = (
+__all__ = ('cache_dir',
            'cfg_dir',
            'default_config_file',
            'default_logging_file',
@@ -303,6 +302,34 @@ In order to load a pre-saved configuration file, use the :py:func:`load` method:
                   .format(dir=pyemma_cfg_dir), '\n', stars, sep='')
 
     ### SETTINGS
+
+    @property
+    def cache_dir(self):
+        """ Cache directory in which cache files are being stored. """
+        value = self._conf_values.get('pyemma', 'cache_dir')
+
+        if value == 'None':
+            import tempfile
+            value = tempfile.gettempdir()
+            self.cache_dir = value
+
+        return value
+
+    @cache_dir.setter
+    def cache_dir(self, value):
+
+        if value is None:
+            import tempfile
+            value = tempfile.gettempdir()
+
+        if not os.path.exists(value):
+            import warnings
+            warnings.warn("Cache dir did not exist, creating it...")
+            os.makedirs(value)
+
+        value = os.path.abspath(value)
+        self._conf_values.set('pyemma', 'cache_dir', value)
+
     @property
     def logging_config(self):
         cfg = self._conf_values.get('pyemma', 'logging_config')
@@ -311,8 +338,8 @@ In order to load a pre-saved configuration file, use the :py:func:`load` method:
         return cfg
 
     # FIXME: how should we re-initialize logging without interfering with existing loggers?
-    #@logging_config.setter
-    #def logging_config(self, config):
+    # @logging_config.setter
+    # def logging_config(self, config):
     #    """ Try to re-initialize logging system for package 'pyemma'.
     #
     #    Parameters
@@ -340,6 +367,7 @@ In order to load a pre-saved configuration file, use the :py:func:`load` method:
     def traj_info_max_size(self, val):
         val = str(int(val))
         self._conf_values.set('pyemma', 'traj_info_max_size', val)
+
     @property
     def show_progress_bars(self):
         return self._conf_values.getboolean('pyemma', 'show_progress_bars')
@@ -429,5 +457,10 @@ In order to load a pre-saved configuration file, use the :py:func:`load` method:
     def _format_msg(msg):
         from pyemma import __version__
         return "[PyEMMA {version}] {msg}".format(version=__version__, msg=msg)
+
+    def __repr__(self):
+        cfg_pairs = {k: getattr(self, k) for k in self.keys()}
+        return "[PyEMMA Config: {}]".format(cfg_pairs)
+
 
 sys.modules[__name__] = Wrapper(sys.modules[__name__])

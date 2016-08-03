@@ -152,6 +152,9 @@ class TestConfig(unittest.TestCase):
         self.config_inst.traj_info_max_entries = 1
         self.assertEqual(self.config_inst.traj_info_max_entries, 1)
 
+    def test_cache_dir(self):
+        assert os.path.isdir(self.config_inst.cache_dir)
+
 
 if __name__ == "__main__":
     unittest.main()
