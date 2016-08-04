@@ -63,8 +63,9 @@ class TestCache(unittest.TestCase):
         np.testing.assert_allclose(tica_cache_inp.cov, tica_without_cache.cov, atol=1e-10)
         np.testing.assert_allclose(tica_cache_inp.cov_tau, tica_without_cache.cov_tau, atol=1e-10)
 
-        np.testing.assert_allclose(tica_cache_inp.eigenvalues, tica_without_cache.eigenvalues, atol=1e-6)
-        np.testing.assert_allclose(tica_cache_inp.eigenvectors, tica_without_cache.eigenvectors, atol=1e-6)
+        np.testing.assert_allclose(tica_cache_inp.eigenvalues, tica_without_cache.eigenvalues, atol=1e-7)
+        np.testing.assert_allclose(np.abs(tica_cache_inp.eigenvectors),
+                                   np.abs(tica_without_cache.eigenvectors), atol=1e-6)
 
 
 if __name__ == '__main__':
