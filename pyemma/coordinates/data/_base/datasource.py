@@ -410,6 +410,10 @@ class DataSourceIterator(six.with_metaclass(ABCMeta)):
     def use_cols(self):
         return self.state.cols
 
+    @use_cols.setter
+    def use_cols(self, val):
+        self.state.cols = val
+
     @property
     def skip(self):
         """
@@ -622,6 +626,8 @@ class DataSourceIterator(six.with_metaclass(ABCMeta)):
         self.state.pos = self.state.pos_adv
         try:
             X = self._use_cols(self._next_chunk())
+            #if config.coordinates_check_input:
+            #    check_array(X)
         except StopIteration:
             self._last_chunk_in_traj = True
             raise
