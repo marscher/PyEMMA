@@ -7,6 +7,7 @@ from pyemma._base.logging import Loggable
 from pyemma._base.progress import ProgressReporter
 from pyemma.coordinates.data._base.datasource import DataSource
 from pyemma.coordinates.data.data_in_memory import DataInMemoryIterator
+from pyemma.coordinates.data.util.traj_info_cache import TrajectoryInfoCache
 from pyemma.util import config
 from pyemma.util.annotators import fix_docs
 from pyemma.util.units import bytes_to_string
@@ -39,6 +40,7 @@ class _CacheFile(Loggable, ProgressReporter):
             self.validate_cache()
 
     def validate_cache(self):
+        # 0. we've ensured that different parameters or pipeline arrangement will use another cache file!
         # 1. check shapes, remove those which do not match.
         # 2.
         for i, item in enumerate(self.file_handle.items()):
@@ -86,6 +88,7 @@ class _CacheFile(Loggable, ProgressReporter):
         return table
 
     def __getitem__(self, itraj):
+        # TODO: dont index by itraj, but by TrajInfo.hash_value to ignore input order and allow to add files.
         try:
             res = self.file_handle[str(itraj)]
             self.hits[itraj] += 1
@@ -170,6 +173,47 @@ class _Cache(DataSource):
             descriptions.append(src.describe())
             last_src = src
 
+        from hashlib import sha256
+        hasher = sha256()
+        inp = str(descriptions).encode()
+        hasher.update(inp)
+        res = hasher.hexdigest()
+        return "{prefix}_{hash}.{suffix}".format(prefix=self._data_producer.__class__.__name__,
+                                                 hash=res, suffix=".h5")
+
+    @property
+    def current_cache_name_new(self):
+        """ file name of the cache
+
+        build this up from the source file names and the parameters.
+          * Files are hashed by the TrajInfoDatabase and stored in cache file (TODO)
+          * hash parameters (stride, featurizer)
+        """
+        files = self.data_producer.filenames
+        inst = TrajectoryInfoCache.instance()
+        reader = self.data_producer
+        while not reader.is_reader:
+            reader = reader.data_producer
+
+        assert reader
+        assert reader.is_reader
+        file_hashes = [inst[file, reader].hash_value for file in files]
+
+        descriptions = []
+
+        from pyemma.coordinates.data import FeatureReader
+        if isinstance(reader, FeatureReader):
+            descriptions.append(reader.featurizer.describe())
+
+        # get params of estimators
+        dp = self.data_producer
+        while dp is not dp.data_producer:
+            from pyemma._base.estimator import Estimator
+            if isinstance(dp, Estimator):
+                descriptions.append(dp.get_params())
+            dp = dp.data_producer
+
+        # hash description list to build file name
         from hashlib import sha256
         hasher = sha256()
         inp = str(descriptions).encode()

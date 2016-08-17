@@ -61,11 +61,17 @@ class TestCache(unittest.TestCase):
         tica_without_cache = pyemma.coordinates.tica(src)
 
         np.testing.assert_allclose(tica_cache_inp.cov, tica_without_cache.cov, atol=1e-10)
-        np.testing.assert_allclose(tica_cache_inp.cov_tau, tica_without_cache.cov_tau, atol=1e-10)
+        np.testing.assert_allclose(tica_cache_inp.cov_tau, tica_without_cache.cov_tau, atol=1e-9)
 
         np.testing.assert_allclose(tica_cache_inp.eigenvalues, tica_without_cache.eigenvalues, atol=1e-7)
         np.testing.assert_allclose(np.abs(tica_cache_inp.eigenvectors),
                                    np.abs(tica_without_cache.eigenvectors), atol=1e-6)
+
+    def test_cache_invalidation(self):
+        src = pyemma.coordinates.source(self.files, chunk_size=0)
+        t = pyemma.coordinates.tica(src)
+        cache = _Cache(t)
+        cache .current_cache_name_new
 
 
 if __name__ == '__main__':
