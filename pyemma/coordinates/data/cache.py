@@ -50,11 +50,11 @@ class _CacheFile(Loggable, ProgressReporter):
                 del self.file_handle[item[0]]
         self.file_handle.flush()
 
-    def _create_cache_itraj(self, itraj):
-        length = self.data_source.trajectory_length(itraj)
-        ndim = self.data_source.ndim
+    def _create_cache_itraj(self, traj_info):
+        length = traj_info.length
+        ndim = traj_info.ndim
         try:
-            dataset = self.file_handle.create_dataset(name=str(itraj),
+            dataset = self.file_handle.create_dataset(name=traj_info.hash_value,
                                                       shape=(length, ndim),
                                                       dtype=self.cache.output_type(),
                                                       chunks=True,
@@ -87,10 +87,28 @@ class _CacheFile(Loggable, ProgressReporter):
         self.file_handle.flush()
         return table
 
+    def _itraj_to_file_hash(self, itraj):
+        file = self.cache.filenames[itraj]
+        inst = TrajectoryInfoCache.instance()
+        info = inst[file, self.cache._real_reader]
+        return info
+
     def __getitem__(self, itraj):
-        # TODO: dont index by itraj, but by TrajInfo.hash_value to ignore input order and allow to add files.
+        """
+        fake a list of arrays and give underlying h5py dataset containing the real data.
+
+        Parameters
+        ----------
+        itraj
+
+        Returns
+        -------
+        table
+
+        """
+        traj_info = self._itraj_to_file_hash(itraj)
         try:
-            res = self.file_handle[str(itraj)]
+            res = self.file_handle[traj_info.hash_value]
             self.hits[itraj] += 1
             self.logger.debug("HIT")
             return res
@@ -98,7 +116,7 @@ class _CacheFile(Loggable, ProgressReporter):
             self.logger.debug("MISS")
             self.misses += 1
             # 1. create table
-            table = self._create_cache_itraj(itraj)
+            table = self._create_cache_itraj(traj_info)
 
             # 2. fill cache
             self.fill_cache(table, itraj)
@@ -106,18 +124,10 @@ class _CacheFile(Loggable, ProgressReporter):
             return table
 
     def __repr__(self):
-        size = bytes_to_string(self.file_handle.id.get_filesize())  # os.stat(self.file_handle.filename).st_size)
+        size = bytes_to_string(self.file_handle.id.get_filesize())
         return "[CacheFile {fn}: items={n} size={size}]".format(fn=self.file_handle.filename,
                                                                 n=len(self.file_handle),
                                                                 size=size)
-
-    def invalidate(self):
-        """ invalidate the cache file (maybe not throw the data away here...?
-        TODO: provide a setting to keep data"""
-
-        # self._cache_file
-
-        pass
 
     def __len__(self):
         return len(self.file_handle)
@@ -138,10 +148,18 @@ class _Cache(DataSource):
         super(_Cache, self).__init__(chunksize=chunksize)
 
         self.data_producer = data_source
-        first_cache_file = _CacheFile(self, self.current_cache_name)
+        reader = self.data_producer
+        while not reader.is_reader:
+            reader = reader.data_producer
+
+        assert reader
+        assert reader.is_reader
+        self._real_reader = reader
+
+        first_cache_file = _CacheFile(self, self.current_cache_file_name)
 
         # provide the data list
-        self._cache_files = {self.current_cache_name: first_cache_file}
+        self._cache_files = {self.current_cache_file_name: first_cache_file}
 
         self._ndim = self.data_producer.ndim
         self._ntraj = self.data_producer.ntraj
@@ -149,7 +167,7 @@ class _Cache(DataSource):
 
     @property
     def data(self):
-        return self._cache_files[self.current_cache_name]
+        return self._cache_files[self.current_cache_file_name]
 
     @property
     def data_producer(self):
@@ -162,56 +180,37 @@ class _Cache(DataSource):
         self._data_producer = val
 
     @property
-    def current_cache_name(self):
-        """ file name of the cache"""
-        src = self.data_producer
-        assert src
-        descriptions = []
-        last_src = None
-        while src != last_src:
-            # TODO: describe not impled everywhere, maybe define a hash method in a super class and use this.
-            descriptions.append(src.describe())
-            last_src = src
+    def current_cache_file_name(self):
+        """ file name of the cache.
 
-        from hashlib import sha256
-        hasher = sha256()
-        inp = str(descriptions).encode()
-        hasher.update(inp)
-        res = hasher.hexdigest()
-        return "{prefix}_{hash}.{suffix}".format(prefix=self._data_producer.__class__.__name__,
-                                                 hash=res, suffix=".h5")
+        it is unique depending on the pipeline structure and the estimation parameters of each
+        element in the pipeline
 
-    @property
-    def current_cache_name_new(self):
-        """ file name of the cache
-
-        build this up from the source file names and the parameters.
-          * Files are hashed by the TrajInfoDatabase and stored in cache file (TODO)
-          * hash parameters (stride, featurizer)
         """
-        files = self.data_producer.filenames
-        inst = TrajectoryInfoCache.instance()
-        reader = self.data_producer
-        while not reader.is_reader:
-            reader = reader.data_producer
-
-        assert reader
-        assert reader.is_reader
-        file_hashes = [inst[file, reader].hash_value for file in files]
-
         descriptions = []
 
         from pyemma.coordinates.data import FeatureReader
-        if isinstance(reader, FeatureReader):
-            descriptions.append(reader.featurizer.describe())
+        if isinstance(self._real_reader, FeatureReader):
+            descriptions.append(self._real_reader.featurizer.describe())
 
         # get params of estimators
         dp = self.data_producer
         while dp is not dp.data_producer:
             from pyemma._base.estimator import Estimator
             if isinstance(dp, Estimator):
-                descriptions.append(dp.get_params())
+                descriptions.append(repr(dp))
+
+            from pyemma.coordinates.transform.transformer import StreamingTransformer
+            if isinstance(dp, StreamingTransformer):
+                pass
             dp = dp.data_producer
+
+        # TODO: we maybe do not have a pipeline, but just a reader without descriptions, but we do not want to include the filenames, right?
+        if not descriptions:
+            descriptions.append(self._real_reader.filenames)
+
+        #import pprint
+        #self.logger.debug("descriptions:\n{}".format(pprint.pformat(descriptions)))
 
         # hash description list to build file name
         from hashlib import sha256
@@ -220,7 +219,7 @@ class _Cache(DataSource):
         hasher.update(inp)
         res = hasher.hexdigest()
         return "{prefix}_{hash}.{suffix}".format(prefix=self._data_producer.__class__.__name__,
-                                                 hash=res, suffix=".h5")
+                                                 hash=res, suffix="hdf5")
 
     def _create_iterator(self, skip=0, chunk=0, stride=1, return_trajindex=True, cols=None):
         return DataInMemoryIterator(self, skip, chunk, stride, return_trajindex, cols)
@@ -247,4 +246,5 @@ class _Cache(DataSource):
         return sum(len(f) for f in self._cache_files)
 
     def __repr__(self):
-        return "[Cache => {}".format(repr(self._cache_files[self.current_cache_name]))
+        # TODO: add a description of the current pipeline
+        return "[Cache => {}".format(repr(self._cache_files[self.current_cache_file_name]))

@@ -113,6 +113,9 @@ class TrajInfo(object):
         return "[TrajInfo hash={hash}, len={len}, dim={dim}, path={path}". \
             format(hash=self.hash_value, len=self.length, dim=self.ndim, path=self.abs_path)
 
+    def __hash__(self):
+        return hash(self.hash_value)
+
 
 class TrajectoryInfoCache(object):
 
