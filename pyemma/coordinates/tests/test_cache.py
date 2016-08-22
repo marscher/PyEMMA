@@ -53,7 +53,7 @@ class TestCache(unittest.TestCase):
         actual = cache.get_output(stride=stride, dimensions=dim, skip=skip)
         np.testing.assert_allclose(actual, desired)
 
-    def test_with_tica(self):
+    def test_tica_cached_input(self):
         src = pyemma.coordinates.source(self.files, chunk_size=0)
         cache = _Cache(src)
         tica_cache_inp = pyemma.coordinates.tica(cache)
@@ -66,6 +66,15 @@ class TestCache(unittest.TestCase):
         np.testing.assert_allclose(tica_cache_inp.eigenvalues, tica_without_cache.eigenvalues, atol=1e-7)
         np.testing.assert_allclose(np.abs(tica_cache_inp.eigenvectors),
                                    np.abs(tica_without_cache.eigenvectors), atol=1e-6)
+
+    def test_tica_cached_output(self):
+        src = pyemma.coordinates.source(self.files, chunk_size=0)
+        tica = pyemma.coordinates.tica(src)
+        cache = _Cache(tica)
+
+        tica_output = tica.get_output()
+
+        np.testing.assert_allclose(cache.get_output(), tica_output)
 
     def test_cache_switch_cache_file(self):
         src = pyemma.coordinates.source(self.files, chunk_size=0)
@@ -88,6 +97,11 @@ class TestCache(unittest.TestCase):
         new_name_of_cache = cache.current_cache_file_name
 
         self.assertNotEqual(name_of_cache, new_name_of_cache)
+
+        # remove 2nd feature and check we've got the old name back.
+        reader.featurizer.active_features.pop()
+        self.assertEqual(cache.current_cache_file_name, name_of_cache)
+
 
 if __name__ == '__main__':
     unittest.main()
