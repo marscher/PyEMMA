@@ -127,7 +127,8 @@ class SqliteDB(AbstractDB):
 
         import sched
         s = sched.scheduler()
-        s.enter(delay=20, priority=1, action=self._write_timestamps_to_lru_database, argument=(self, s))
+        s.enter(delay=0, priority=0, action=self._write_timestamps_to_lru_database, argument=(s,))
+        s.run()
 
         try:
             cursor = self._database.execute("select num from version")
@@ -273,6 +274,10 @@ class SqliteDB(AbstractDB):
         # group updates by db names:
         import itertools
         import sqlite3
+        if not self._read_timestamps:
+            schedular.enter(delay=20, priority=1, action=self._write_timestamps_to_lru_database,
+                            argument=(self, schedular))
+            return
 
         for db_name, updates in itertools.groupby(self._database_from_key(self._read_timestamps.keys())):
             updates = list(updates)
