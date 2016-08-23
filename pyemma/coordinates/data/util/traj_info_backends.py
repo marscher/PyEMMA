@@ -123,6 +123,8 @@ class SqliteDB(AbstractDB):
                                          isolation_level=None)
         self.filename = filename
 
+        self._read_timestamps = {}
+
         try:
             cursor = self._database.execute("select num from version")
             row = cursor.fetchone()
@@ -150,7 +152,7 @@ class SqliteDB(AbstractDB):
         # assumes self.database is a sqlite3.Connection
         create_version_table = "CREATE TABLE version (num INTEGER PRIMARY KEY);"
         create_info_table = """CREATE TABLE traj_info(
-            hash VARCHAR(64) PRIMARY KEY,
+            hash VARCHAR(32) PRIMARY KEY,
             length INTEGER,
             ndim INTEGER,
             offsets NPARRAY,
@@ -159,8 +161,10 @@ class SqliteDB(AbstractDB):
             lru_db INTEGER
         );
         """
+        create_index = "CREATE INDEX IF NOT EXISTS idx_traj_info ON traj_info(hash);"
         self._database.execute(create_version_table)
         self._database.execute(create_info_table)
+        self._database.execute(create_index)
         self._database.commit()
 
     def close(self):
@@ -250,26 +254,49 @@ class SqliteDB(AbstractDB):
         mkdir_p(directory)
         return os.path.join(directory, db_name)
 
+    # TODO: expensive
     def _update_time_stamp(self, hash_value):
-        """ timestamps are being stored distributed over several lru databases.
-        The timestamp is a time.time() snapshot (float), which are seconds since epoch."""
+        """ the timestamp is a time.time() snapshot (float), which are seconds since epoch."""
+
+        self._read_timestamps[hash_value] = time.time()
+
+    def _write_timestamps_to_lru_database(self):
+        """
+        run this in a thread every n minutes.
+
+        TODO: howto ensure it is finally written?
+
+        timestamps are being stored distributed over several lru databases."""
+
+
+        # group updates by db names:
+        import itertools
+        import sqlite3
+
+        for db_name, updates in itertools.groupby(self._database_from_key(self._read_timestamps.keys())):
+            updates = list(updates)
+            with sqlite3.connect(db_name) as conn:
+                stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)"
+                cur = conn.execute('select * from usage where hash=?', (hash_value,))
+                row = cur.fetchone()
+                if not row:
+                    conn.execute("insert into usage(hash, last_read) values(?, ?)", (hash_value, time.time()))
+                else:
+                    conn.execute("update usage set last_read=? where hash=?", (time.time(), hash_value))
+                conn.executemany()
+
         db_name = self._database_from_key(hash_value)
         if not db_name:
-            db_name=':memory:'
-
-        import sqlite3
+            logger.debug("using in memory LRU")
+            db_name = ':memory:'
 
         with sqlite3.connect(db_name) as conn:
             """ last_read is a result of time.time()"""
             conn.execute('CREATE TABLE IF NOT EXISTS usage '
                          '(hash VARCHAR(32), last_read FLOAT)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
             conn.commit()
-            cur = conn.execute('select * from usage where hash=?', (hash_value,))
-            row = cur.fetchone()
-            if not row:
-                conn.execute("insert into usage(hash, last_read) values(?, ?)", (hash_value, time.time()))
-            else:
-                conn.execute("update usage set last_read=? where hash=?", (time.time(), hash_value))
+
             conn.commit()
 
     @staticmethod
