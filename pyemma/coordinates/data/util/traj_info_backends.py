@@ -125,6 +125,10 @@ class SqliteDB(AbstractDB):
 
         self._read_timestamps = {}
 
+        import sched
+        s = sched.scheduler()
+        s.enter(delay=20, priority=1, action=self._write_timestamps_to_lru_database, argument=(self, s))
+
         try:
             cursor = self._database.execute("select num from version")
             row = cursor.fetchone()
@@ -254,50 +258,39 @@ class SqliteDB(AbstractDB):
         mkdir_p(directory)
         return os.path.join(directory, db_name)
 
-    # TODO: expensive
     def _update_time_stamp(self, hash_value):
         """ the timestamp is a time.time() snapshot (float), which are seconds since epoch."""
 
         self._read_timestamps[hash_value] = time.time()
 
-    def _write_timestamps_to_lru_database(self):
+    def _write_timestamps_to_lru_database(self, schedular):
         """
         run this in a thread every n minutes.
 
         TODO: howto ensure it is finally written?
 
         timestamps are being stored distributed over several lru databases."""
-
-
         # group updates by db names:
         import itertools
         import sqlite3
 
         for db_name, updates in itertools.groupby(self._database_from_key(self._read_timestamps.keys())):
             updates = list(updates)
+            if not db_name:
+                logger.debug("using in memory LRU")
+                db_name = ':memory:'
             with sqlite3.connect(db_name) as conn:
-                stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)"
-                cur = conn.execute('select * from usage where hash=?', (hash_value,))
-                row = cur.fetchone()
-                if not row:
-                    conn.execute("insert into usage(hash, last_read) values(?, ?)", (hash_value, time.time()))
-                else:
-                    conn.execute("update usage set last_read=? where hash=?", (time.time(), hash_value))
-                conn.executemany()
+                """ last_read is a result of time.time()"""
+                conn.execute('CREATE TABLE IF NOT EXISTS usage '
+                             '(hash VARCHAR(32), last_read FLOAT)')
+                conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
 
-        db_name = self._database_from_key(hash_value)
-        if not db_name:
-            logger.debug("using in memory LRU")
-            db_name = ':memory:'
+                stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)" \
+                        " values (?, ?) "
+                conn.executemany(stmnt, updates)
 
-        with sqlite3.connect(db_name) as conn:
-            """ last_read is a result of time.time()"""
-            conn.execute('CREATE TABLE IF NOT EXISTS usage '
-                         '(hash VARCHAR(32), last_read FLOAT)')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
-            conn.commit()
-
-            conn.commit()
+        schedular.enter(delay=20, priority=1, action=self._write_timestamps_to_lru_database,
+                        argument=(self, schedular))
 
     @staticmethod
     def _create_traj_info(row):
@@ -354,14 +347,17 @@ class SqliteDB(AbstractDB):
         logger.debug("distribution of lru: %s" % str(len_by_db))
         ### end dbg
 
-        self.lru_timeout = 1000 #1 sec
+        self.lru_timeout = 1000  # 1 sec
 
-        # collect timestamps from databases
-        for db in hashs_by_db.keys():
-            with sqlite3.connect(db, timeout=self.lru_timeout) as conn:
-                rows = conn.execute("select hash, last_read from usage").fetchall()
-                for r in rows:
-                    age_by_hash.append((r[0], float(r[1]), db))
+        try:
+            # collect timestamps from databases
+            for db in hashs_by_db.keys():
+                with sqlite3.connect(db, timeout=self.lru_timeout) as conn:
+                    rows = conn.execute("select hash, last_read from usage").fetchall()
+                    for r in rows:
+                        age_by_hash.append((r[0], float(r[1]), db))
+        except sqlite3.OperationalError:
+            return
 
         # sort by age
         age_by_hash.sort(key=itemgetter(1))
