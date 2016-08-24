@@ -6,24 +6,49 @@ from glob import glob
 import os
 
 from pyemma.coordinates.data.cache import _Cache
+from pyemma.util import config
 
-
-class TestCache(unittest.TestCase):
+class ProfilerCase(unittest.TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-
-        self.length = 1000
-        self.dim = 3
-        data = [np.random.random((self.length, self.dim)) for _ in range(10)]
-
-        for i, x in enumerate(data):
-            np.save(os.path.join(self.test_dir, "{}.npy".format(i)), x)
-
-        self.files = glob(self.test_dir + "/*.npy")
+        import cProfile
+        self.pr = cProfile.Profile()
+        self.pr.enable()
 
     def tearDown(self):
+        self.pr.dump_stats(self._testMethodName)
+
+
+class TestCache(ProfilerCase):
+    
+    @classmethod
+    def setUpClass(cls):
+        config.use_trajectory_lengths_cache = False
+        cls.test_dir = tempfile.mkdtemp(prefix="test_cache_")
+
+        cls.length = 1000
+        cls.dim = 3
+        data = [np.random.random((cls.length, cls.dim)) for _ in range(10)]
+
+        for i, x in enumerate(data):
+            np.save(os.path.join(cls.test_dir, "{}.npy".format(i)), x)
+
+        cls.files = glob(cls.test_dir + "/*.npy")
+    
+    def setUp(self):
+        super(TestCache, self).setUp()
+        self.tmp_cache_dir = tempfile.mkdtemp(dir=self.test_dir)
+        config.cache_dir = self.tmp_cache_dir
+
+    @classmethod
+    def tearDownClass(cls):
         import shutil
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        shutil.rmtree(cls.test_dir, ignore_errors=True)
+
+        from pyemma.coordinates.data.cache import _used_files
+        import pprint
+        pprint.pprint(_used_files)
+        print("*"*80)
+        pprint.pprint(set(_used_files))
 
     def test_cache_hits(self):
         src = pyemma.coordinates.source(self.files, chunk_size=1000)
@@ -53,9 +78,12 @@ class TestCache(unittest.TestCase):
         actual = cache.get_output(stride=stride, dimensions=dim, skip=skip)
         np.testing.assert_allclose(actual, desired)
 
+    #@unittest.skip("test")
     def test_tica_cached_input(self):
         src = pyemma.coordinates.source(self.files, chunk_size=0)
         cache = _Cache(src)
+        print("cache inp fileeeeeeeeeeeeee", cache.current_cache_file_name)
+
         tica_cache_inp = pyemma.coordinates.tica(cache)
 
         tica_without_cache = pyemma.coordinates.tica(src)
@@ -70,9 +98,10 @@ class TestCache(unittest.TestCase):
     def test_tica_cached_output(self):
         src = pyemma.coordinates.source(self.files, chunk_size=0)
         tica = pyemma.coordinates.tica(src)
-        cache = _Cache(tica)
 
         tica_output = tica.get_output()
+        cache = _Cache(tica)
+        print("cache fileeeeeeeeeeeeee", cache.current_cache_file_name)
 
         np.testing.assert_allclose(cache.get_output(), tica_output)
 
@@ -101,6 +130,11 @@ class TestCache(unittest.TestCase):
         # remove 2nd feature and check we've got the old name back.
         reader.featurizer.active_features.pop()
         self.assertEqual(cache.current_cache_file_name, name_of_cache)
+
+        # add a new file and ensure we still got the same cache file
+        reader.filenames.append(os.path.join(path, 'bpti_001-033.xtc'))
+        self.assertEqual(cache.current_cache_file_name, name_of_cache)
+
 
 
 if __name__ == '__main__':
