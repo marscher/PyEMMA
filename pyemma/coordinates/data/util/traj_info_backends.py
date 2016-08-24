@@ -90,12 +90,14 @@ class DictDB(AbstractDB):
 
 
 class SqliteDB(AbstractDB):
-    def __init__(self, filename=None, clean_n_entries=30):
+    def __init__(self, filename=None, clean_n_entries=30, lru_periodic_writes=30):
         """
         :param filename: path to database file
         :param clean_n_entries: during cleaning delete n % entries.
+        :param lru_periodic_writes: how often the backend will store the LRU databases to disk.
         """
         self.clean_n_entries = clean_n_entries
+        self.lru_periodic_writes = lru_periodic_writes
         import sqlite3
 
         # register numpy array conversion functions
@@ -126,7 +128,7 @@ class SqliteDB(AbstractDB):
         self._read_timestamps = {}
 
         import threading
-        #threading.Timer(10, self._write_timestamps_to_lru_database).start()
+        threading.Timer(self.lru_periodic_writes, self._write_timestamps_to_lru_database).start()
 
         try:
             cursor = self._database.execute("select num from version")
@@ -299,7 +301,7 @@ class SqliteDB(AbstractDB):
                 for k in updates:
                     del self._read_timestamps[k[0]]
 
-        threading.Timer(20, self._write_timestamps_to_lru_database)
+        threading.Timer(self.lru_periodic_writes, self._write_timestamps_to_lru_database)
 
     @staticmethod
     def _create_traj_info(row):
