@@ -128,7 +128,9 @@ class SqliteDB(AbstractDB):
         self._read_timestamps = {}
 
         import threading
-        threading.Timer(self.lru_periodic_writes, self._write_timestamps_to_lru_database).start()
+        t = threading.Thread(target=self._write_timestamps_to_lru_database)
+        t.daemon = True
+        t.start()
 
         try:
             cursor = self._database.execute("select num from version")
@@ -273,35 +275,35 @@ class SqliteDB(AbstractDB):
         import itertools
         import sqlite3
         from operator import itemgetter
-        import threading
 
-        if self._read_timestamps.keys():
-            # group updates by db names:
-            dbs_per_key = [(self._database_from_key(hash_value), hash_value, t) for hash_value, t
-                           in self._read_timestamps.items()]
-            # sort by db name, only if file name is set, since we will store in memory otherwise.
-            if self.filename:
-                dbs_per_key.sort(key=itemgetter(0))
+        while True:
+            if self._read_timestamps.keys():
+                # group updates by db names:
+                dbs_per_key = [(self._database_from_key(hash_value), hash_value, t) for hash_value, t
+                               in self._read_timestamps.items()]
+                # sort by db name, only if file name is set, since we will store in memory otherwise.
+                if self.filename:
+                    dbs_per_key.sort(key=itemgetter(0))
 
-            for db_name, updates in itertools.groupby(dbs_per_key, itemgetter(0)):
-                updates = [(x[1], x[2]) for x in updates]
-                if not db_name:
-                    logger.debug("using in memory LRU")
-                    db_name = ':memory:'
-                with sqlite3.connect(db_name) as conn:
-                    """ last_read is a result of time.time()"""
-                    conn.execute('CREATE TABLE IF NOT EXISTS usage '
-                                 '(hash VARCHAR(32), last_read FLOAT)')
-                    conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
+                for db_name, updates in itertools.groupby(dbs_per_key, itemgetter(0)):
+                    updates = [(x[1], x[2]) for x in updates]
+                    if not db_name:
+                        logger.debug("using in memory LRU")
+                        db_name = ':memory:'
+                    with sqlite3.connect(db_name) as conn:
+                        """ last_read is a result of time.time()"""
+                        conn.execute('CREATE TABLE IF NOT EXISTS usage '
+                                     '(hash VARCHAR(32), last_read FLOAT)')
+                        conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
 
-                    stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)" \
-                            " values (?, ?) "
-                    conn.executemany(stmnt, updates)
+                        stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)" \
+                                " values (?, ?) "
+                        conn.executemany(stmnt, updates)
 
-                for k in updates:
-                    del self._read_timestamps[k[0]]
+                    for k in updates:
+                        del self._read_timestamps[k[0]]
 
-        threading.Timer(self.lru_periodic_writes, self._write_timestamps_to_lru_database)
+                time.sleep(self.lru_periodic_writes)
 
     @staticmethod
     def _create_traj_info(row):
