@@ -326,5 +326,19 @@ class TestTrajectoryInfoCache(unittest.TestCase):
             except ConfigDirectoryException:
                 pass
 
+    def test_lru_write(self):
+        from hashlib import md5
+        import os
+        import time
+        h = md5()
+        hashes = {}
+        for _ in range(10):
+            h.update(os.urandom(100))
+            hashes[h.hexdigest()] = time.time()
+
+        self.db._database._read_timestamps = hashes
+        self.db._database._write_timestamps_to_lru_database()
+
+
 if __name__ == "__main__":
     unittest.main()

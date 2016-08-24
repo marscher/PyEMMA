@@ -125,10 +125,8 @@ class SqliteDB(AbstractDB):
 
         self._read_timestamps = {}
 
-        import sched
-        s = sched.scheduler()
-        s.enter(delay=0, priority=0, action=self._write_timestamps_to_lru_database, argument=(s,))
-        s.run()
+        import threading
+        #threading.Timer(10, self._write_timestamps_to_lru_database).start()
 
         try:
             cursor = self._database.execute("select num from version")
@@ -261,41 +259,47 @@ class SqliteDB(AbstractDB):
 
     def _update_time_stamp(self, hash_value):
         """ the timestamp is a time.time() snapshot (float), which are seconds since epoch."""
-
         self._read_timestamps[hash_value] = time.time()
 
-    def _write_timestamps_to_lru_database(self, schedular):
+    def _write_timestamps_to_lru_database(self):
         """
         run this in a thread every n minutes.
 
         TODO: howto ensure it is finally written?
 
         timestamps are being stored distributed over several lru databases."""
-        # group updates by db names:
         import itertools
         import sqlite3
-        if not self._read_timestamps:
-            schedular.enter(delay=20, priority=1, action=self._write_timestamps_to_lru_database,
-                            argument=(self, schedular))
-            return
+        from operator import itemgetter
+        import threading
 
-        for db_name, updates in itertools.groupby(self._database_from_key(self._read_timestamps.keys())):
-            updates = list(updates)
-            if not db_name:
-                logger.debug("using in memory LRU")
-                db_name = ':memory:'
-            with sqlite3.connect(db_name) as conn:
-                """ last_read is a result of time.time()"""
-                conn.execute('CREATE TABLE IF NOT EXISTS usage '
-                             '(hash VARCHAR(32), last_read FLOAT)')
-                conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
+        if self._read_timestamps.keys():
+            # group updates by db names:
+            dbs_per_key = [(self._database_from_key(hash_value), hash_value, t) for hash_value, t
+                           in self._read_timestamps.items()]
+            # sort by db name, only if file name is set, since we will store in memory otherwise.
+            if self.filename:
+                dbs_per_key.sort(key=itemgetter(0))
 
-                stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)" \
-                        " values (?, ?) "
-                conn.executemany(stmnt, updates)
+            for db_name, updates in itertools.groupby(dbs_per_key, itemgetter(0)):
+                updates = [(x[1], x[2]) for x in updates]
+                if not db_name:
+                    logger.debug("using in memory LRU")
+                    db_name = ':memory:'
+                with sqlite3.connect(db_name) as conn:
+                    """ last_read is a result of time.time()"""
+                    conn.execute('CREATE TABLE IF NOT EXISTS usage '
+                                 '(hash VARCHAR(32), last_read FLOAT)')
+                    conn.execute('CREATE INDEX IF NOT EXISTS idx_usage_hash ON usage(hash);')
 
-        schedular.enter(delay=20, priority=1, action=self._write_timestamps_to_lru_database,
-                        argument=(self, schedular))
+                    stmnt = "INSERT OR REPLACE INTO usage (hash, last_read)" \
+                            " values (?, ?) "
+                    conn.executemany(stmnt, updates)
+
+                for k in updates:
+                    del self._read_timestamps[k[0]]
+
+        threading.Timer(20, self._write_timestamps_to_lru_database)
 
     @staticmethod
     def _create_traj_info(row):
