@@ -105,7 +105,7 @@ static PyObject *cluster(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0) {
         distance = euclidean_distance;
     } else if(strcmp(metric,"minRMSD")==0) {
-        distance = minRMSD_distance;
+        distance = load_minRMSD_distance();
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -238,7 +238,7 @@ static PyObject* costFunction(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0) {
         distance = euclidean_distance;
     } else if(strcmp(metric,"minRMSD")==0) {
-        distance = minRMSD_distance;
+        distance = load_minRMSD_distance();
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -336,7 +336,7 @@ static PyObject* initCentersKMpp(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0) {
         distance = euclidean_distance;
     } else if(strcmp(metric,"minRMSD")==0) {
-        distance = minRMSD_distance;
+        distance = load_minRMSD_distance();
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }

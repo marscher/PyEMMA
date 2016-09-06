@@ -96,22 +96,27 @@ def extensions():
 
     exts = []
 
-    if sys.platform.startswith('win'):
-        lib_prefix = 'lib'
-    else:
-        lib_prefix = ''
+    lib_prefix = 'lib' if sys.platform.startswith('win') else ''
+
+    # this is NOT a importable python extension, but just a dynamic library.
+    minrmsd_metric = \
+        Extension('pyemma.coordinates.clustering.minRMSD_metric',
+                  sources=['pyemma/coordinates/clustering/src/minRMSD.c'],
+                  include_dirs=['pyemma/coordinates/clustering/include',
+                                mdtraj.capi()['include_dir']],
+                  library_dirs=[mdtraj.capi()['lib_dir']],
+                  libraries=[lib_prefix + 'theobald'],
+                  extra_compile_args=['-std=c99', '-g', '-O3', '-pg'])
+
     regspatial_module = \
         Extension('pyemma.coordinates.clustering.regspatial',
                   sources=[
                       'pyemma/coordinates/clustering/src/regspatial.c',
                       'pyemma/coordinates/clustering/src/clustering.c'],
                   include_dirs=[
-                      mdtraj.capi()['include_dir'],
                       np_inc,
                       'pyemma/coordinates/clustering/include',
                   ],
-                  libraries=[lib_prefix+'theobald'],
-                  library_dirs=[mdtraj.capi()['lib_dir']],
                   extra_compile_args=['-std=c99', '-g', '-O3', '-pg'])
     kmeans_module = \
         Extension('pyemma.coordinates.clustering.kmeans_clustering',
@@ -119,11 +124,8 @@ def extensions():
                       'pyemma/coordinates/clustering/src/kmeans.c',
                       'pyemma/coordinates/clustering/src/clustering.c'],
                   include_dirs=[
-                      mdtraj.capi()['include_dir'],
                       np_inc,
                       'pyemma/coordinates/clustering/include'],
-                  libraries=[lib_prefix+'theobald'],
-                  library_dirs=[mdtraj.capi()['lib_dir']],
                   extra_compile_args=['-std=c99'])
 
     covar_module = \
@@ -138,6 +140,7 @@ def extensions():
     exts += [regspatial_module,
              kmeans_module,
              covar_module,
+             minrmsd_metric
              ]
 
     if not USE_CYTHON:

@@ -33,8 +33,6 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <theobald_rmsd.h>
-#include <center.h>
 #include <stdio.h>
 #include <float.h>
 
@@ -80,11 +78,15 @@ static char ASSIGN_USAGE[] = "assign(chunk, centers, dtraj, metric)\n"\
 "----\n"\
 "This function uses the minRMSD implementation of mdtraj.";
 
+// metrics distance function pointer type:
+typedef float (*distance_fptr)(float*, float*, size_t, float*, float*, float*);
 // euclidean metric
 float euclidean_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n, float *buffer_a, float *buffer_b, float*dummy);
-// minRMSD metric
-float minRMSD_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n, float *SKP_restrict buffer_a, float *SKP_restrict buffer_b,
-float* pre_calc_trace_a);
+// minRMSD distance function, dynamically loaded
+//distance_fptr minRMSD_distance;
+void inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
+    const int N_centers, const int dim);
+
 
 // assignment to cluster centers from python
 PyObject *assign(PyObject *self, PyObject *args);
@@ -95,4 +97,10 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
 #ifdef __cplusplus
 }
 #endif
+
+// dont export
+distance_fptr load_minRMSD_distance();
+void inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
+    const int N_centers, const int dim);
+
 #endif

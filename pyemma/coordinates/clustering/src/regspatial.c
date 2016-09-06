@@ -29,7 +29,7 @@ static PyObject *cluster(PyObject *self, PyObject *args) {
     float cutoff, mindist;
     float d;
     float *buffer_a, *buffer_b;
-    float (*distance)(float*, float*, size_t, float*, float*, float*);
+    distance_fptr distance;
 
     py_centers = NULL; py_item = NULL; py_res = NULL;
     np_chunk = NULL; np_item = NULL;
@@ -58,7 +58,7 @@ static PyObject *cluster(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0)
         distance = euclidean_distance;
     else if(strcmp(metric,"minRMSD")==0) {
-        distance = minRMSD_distance;
+        distance = load_minRMSD_distance();
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -152,7 +152,7 @@ static char CLUSTER_USAGE[] = "cluster(chunk, centers, mindist, metric)\n"\
 "\n"\
 "Note\n"\
 "----\n"\
-"This function uses the minRMSD implementation of mdtraj.";
+"This function optionally uses the minRMSD implementation of mdtraj.";
 
 
 static PyMethodDef regspatialMethods[] =
