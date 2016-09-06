@@ -32,9 +32,14 @@ clustering - Algorithms (:mod:`pyemma.coordinates.clustering`)
     RegularSpaceClustering
     UniformTimeClustering
 """
+# setup path for dynamic linking of minRMSD metric
+import os, pkg_resources
+os.environ['PYEMMA_CLUSTERING_LD'] = os.path.dirname(pkg_resources.resource_filename('pyemma.coordinates.clustering', 'minRMSD_metric'))
+del os, pkg_resources
+
 
 from .assign import AssignCenters
-from .kmeans import KmeansClustering
-from .kmeans import MiniBatchKmeansClustering
+#from .kmeans import KmeansClustering
+#from .kmeans import MiniBatchKmeansClustering
 from .regspace import RegularSpaceClustering
 from .uniform_time import UniformTimeClustering

@@ -24,7 +24,6 @@
     #include <omp.h>
 #endif
 
-
 float euclidean_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n, float *buffer_a, float *buffer_b,
                          float* dummy)
 {
@@ -39,40 +38,6 @@ float euclidean_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n,
 }
 
 
-/*
- * minRMSD distance function
- * a: centers
- * b: frames
- * n: dimension of one frame
- * buffer_a: pre-allocated buffer to store a copy of centers
- * buffer_b: pre-allocated buffer to store a copy of frames
- * trace_a_precalc: pre-calculated trace to centers (pointer to one value)
- */
-float minRMSD_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n,
-                       float *SKP_restrict buffer_a, float *SKP_restrict buffer_b,
-                       float *trace_a_precalc)
-{
-    float msd;
-    float trace_a, trace_b;
-
-    if (! trace_a_precalc) {
-        memcpy(buffer_a, a, n*sizeof(float));
-        memcpy(buffer_b, b, n*sizeof(float));
-
-        inplace_center_and_trace_atom_major(buffer_a, &trace_a, 1, n/3);
-        inplace_center_and_trace_atom_major(buffer_b, &trace_b, 1, n/3);
-
-    } else {
-        // only copy b, since a has been pre-centered,
-        memcpy(buffer_b, b, n*sizeof(float));
-        inplace_center_and_trace_atom_major(buffer_b, &trace_b, 1, n/3);
-        trace_a = *trace_a_precalc;
-    }
-
-    msd = msd_atom_major(n/3, n/3, a, buffer_b, trace_a, trace_b, 0, NULL);
-    return sqrt(msd);
-}
-
 int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
              Py_ssize_t N_frames, Py_ssize_t N_centers, Py_ssize_t dim, int n_threads) {
     int ret;
@@ -84,8 +49,7 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
     float *centers_precentered;
     float *trace_centers_p;
     float *dists;
-    // distance function pointer:
-    float (*distance)(float*, float*, size_t, float*, float*, float*);
+    distance_fptr distance;
     float *SKP_restrict chunk_p;
 
     #ifdef USE_OPENMP
@@ -109,7 +73,7 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
             ret = ASSIGN_ERR_NO_MEMORY;
         }
     } else if(strcmp(metric, "minRMSD")==0) {
-        distance = minRMSD_distance;
+        distance = load_minRMSD_distance();
         centers_precentered = malloc(N_centers*dim*sizeof(float));
         trace_centers_p = malloc(N_centers*sizeof(float));
         dists = malloc(N_centers*sizeof(float));
@@ -122,10 +86,7 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
 
             /* Parallelize centering of cluster generators */
             /* Note that this is already OpenMP-enabled */
-            for (j = 0; j < N_centers; ++j) {
-                inplace_center_and_trace_atom_major(&centers_precentered[j*dim],
-                                                    &trace_centers_p[j], 1, dim/3);
-            }
+            inplace_center_and_trace_atom_major_cluster_centers(centers_precentered, trace_centers_p, N_centers, dim);
             centers = centers_precentered;
             }
     } else {
@@ -256,3 +217,57 @@ PyObject *assign(PyObject *self, PyObject *args) {
 error:
     return py_res;
 }
+
+//#ifdef POSIX
+#include <dlfcn.h>
+
+void* load_minRMSD_lib() {
+ void* handle;
+ char* path = getenv("PYEMMA_CLUSTERING_LD");
+ if (! path) {
+    printf("set the correct path of PYEMMA_CLUSTERING_LD to point to the directory of the minRMSD_metric lib.\n");
+    return NULL;
+ }
+ char* fn = "minRMSD_metric.so";
+ char* abs_path = malloc((strlen(path) + strlen(fn) + 2)*sizeof(char));
+ sprintf(abs_path, "%s/%s", path, fn);
+ handle = dlopen(abs_path, RTLD_LAZY);
+ free(abs_path);
+ return handle;
+}
+
+distance_fptr load_minRMSD_distance() {
+ distance_fptr p;
+ char* err;
+
+void*minRMSD_metric = load_minRMSD_lib();
+
+ p = (distance_fptr) dlsym(minRMSD_metric, "minRMSD_distance");
+ if ((err = dlerror()) != NULL) {
+  /* handle error, the symbol wasn't found */
+  printf("error during loading: %s\n", err);
+ } else {
+   return p;
+ }
+
+ return NULL;
+}
+
+void inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
+    const int N_centers, const int dim) {
+ char* err;
+ typedef void (*center_fptr) (float*, float*, const int, const int);
+ center_fptr p;
+ void* minRMSD_metric = load_minRMSD_lib();
+
+ p = dlsym(minRMSD_metric, "inplace_center_and_trace_atom_major_cluster_centers_impl");
+ if ((err = dlerror()) != NULL) {
+  /* handle error, the symbol wasn't found */
+  printf("error during loading: %s\n", err);
+ } else {
+  /* symbol found, its value is in s */
+  p(centers_precentered, traces_centers_p, N_centers, dim/3);
+ }
+}
+
+//#endif
