@@ -102,7 +102,7 @@ def extensions():
     minrmsd_metric = \
         Extension('pyemma.coordinates.clustering.minRMSD_metric',
                   sources=['pyemma/coordinates/clustering/src/minRMSD.c'],
-                  include_dirs=['pyemma/coordinates/clustering/include',
+                  include_dirs=[np_inc, 'pyemma/coordinates/clustering/include',
                                 mdtraj.capi()['include_dir']],
                   library_dirs=[mdtraj.capi()['lib_dir']],
                   libraries=[lib_prefix + 'theobald'],
