@@ -218,7 +218,7 @@ error:
     return py_res;
 }
 
-//#ifdef POSIX
+#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
 #include <dlfcn.h>
 
 void* load_minRMSD_lib() {
@@ -269,5 +269,8 @@ void inplace_center_and_trace_atom_major_cluster_centers(float* centers_precente
   p(centers_precentered, traces_centers_p, N_centers, dim/3);
  }
 }
-
-//#endif
+#elif(defined(_WINDOWS))
+#error not yet impled...
+#else
+#pragma warning "no dynamic loading method for minRMSD found."
+#endif
