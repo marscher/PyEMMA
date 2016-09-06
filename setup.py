@@ -117,7 +117,13 @@ def extensions():
                       np_inc,
                       'pyemma/coordinates/clustering/include',
                   ],
-                  extra_compile_args=['-std=c99', '-g', '-O3', '-pg'])
+
+                  # include_dirs=[np_inc, 'pyemma/coordinates/clustering/include',
+                  #               mdtraj.capi()['include_dir']],
+                  # library_dirs=[mdtraj.capi()['lib_dir']],
+                  # libraries=[lib_prefix + 'theobald'],
+                  # extra_compile_args=['-std=c99', '-g', '-O3', '-pg'],
+                  )
     kmeans_module = \
         Extension('pyemma.coordinates.clustering.kmeans_clustering',
                   sources=[
