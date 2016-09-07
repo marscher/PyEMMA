@@ -112,7 +112,7 @@ PyInit_minRMSD_metric(void)
 #else // py2
 #define INITERROR return
 
-void init_minRMSD_metric(void)
+void initminRMSD_metric(void)
 #endif
 {
 #if PY_MAJOR_VERSION >= 3
