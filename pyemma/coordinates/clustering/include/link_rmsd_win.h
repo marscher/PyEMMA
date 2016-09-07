@@ -2,6 +2,7 @@
 #define __link_rmsd_win_h
 
 #include <clustering.h>
+#include <windows.h>
 
 void* load_minRMSD_lib() {
  void* handle;
