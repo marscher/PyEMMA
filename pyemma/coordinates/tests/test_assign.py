@@ -188,6 +188,23 @@ class TestClusterAssign(unittest.TestCase):
         with self.assertRaises(ValueError):
             c = coor.assign_to_centers(data, centers)
 
+    def test_min_rmsd(self):
+        import pyemma.datasets as data
+        d = data.get_bpti_test_data()
+        reader = coor.source(d['trajs'], top=d['top'])
+
+        N_centers = 9
+        centers = np.asarray((reader.ra_itraj_jagged[0, [0, 1, 7]],
+                              reader.ra_itraj_jagged[1, [32, 1, 23]],
+                              reader.ra_itraj_jagged[2, [17, 8, 15]])
+                             ).reshape((N_centers, -1))
+        dtraj = coor.assign_to_centers(reader, centers=centers, metric='minRMSD', return_dtrajs=True)
+
+        num_assigned_states = len(np.unique(np.concatenate(dtraj)))
+        self.assertEqual(num_assigned_states, N_centers,
+                         "assigned states=%s out of %s possible ones."
+                         % (num_assigned_states, N_centers))
+
     def test_threads_env_num_threads_fixed(self):
         import os
         old_val = os.getenv('OMP_NUM_THREADS', '')
@@ -262,23 +279,6 @@ class TestClusterAssign(unittest.TestCase):
         assignment_sp = coor.assign_to_centers(X, centers, n_jobs=1, chunk_size=chunksize, metric='minRMSD')
 
         np.testing.assert_equal(assignment_mp, assignment_sp)
-
-    def test_min_rmsd(self):
-        import pyemma.datasets as data
-        d = data.get_bpti_test_data()
-        reader = coor.source(d['trajs'], top=d['top'])
-
-        N_centers = 9
-        centers = np.asarray((reader.ra_itraj_jagged[0, [0, 1, 7]],
-                              reader.ra_itraj_jagged[1, [32, 1, 23]],
-                              reader.ra_itraj_jagged[2, [17, 8, 15]])
-                             ).reshape((N_centers, -1))
-        dtraj = coor.assign_to_centers(reader, centers=centers, metric='minRMSD', return_dtrajs=True)
-
-        num_assigned_states = len(np.unique(np.concatenate(dtraj)))
-        self.assertEqual(num_assigned_states, N_centers,
-                         "assigned states=%s out of %s possible ones."
-                         % (num_assigned_states, N_centers))
 
 
 if __name__ == "__main__":
