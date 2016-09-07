@@ -54,6 +54,88 @@ void inplace_center_and_trace_atom_major_cluster_centers_impl(float* centers_pre
     }
 }
 
+// fake a module
+static PyMethodDef kmeansMethods[] =
+{
+     {NULL, NULL, 0, NULL}
+};
+
+struct module_state {
+    PyObject *error;
+};
+
+#if PY_MAJOR_VERSION >= 3
+#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
+#else
+#define GETSTATE(m) (&_state)
+static struct module_state _state;
+#endif
+
+static PyObject *
+error_out(PyObject *m) {
+    struct module_state *st = GETSTATE(m);
+    PyErr_SetString(st->error, "something bad happened");
+    return NULL;
+}
+
+
+#if PY_MAJOR_VERSION >= 3
+
+static int myextension_traverse(PyObject *m, visitproc visit, void *arg) {
+    Py_VISIT(GETSTATE(m)->error);
+    return 0;
+}
+
+static int myextension_clear(PyObject *m) {
+    Py_CLEAR(GETSTATE(m)->error);
+    return 0;
+}
+
+
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "minRMSD_metric",
+        NULL,
+        sizeof(struct module_state),
+        kmeansMethods,
+        NULL,
+        myextension_traverse,
+        myextension_clear,
+        NULL
+};
+
+#define INITERROR return NULL
+
+PyObject *
+PyInit_minRMSD_metric(void)
+
+#else // py2
+#define INITERROR return
+
+void init_minRMSD_metric(void)
+#endif
+{
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&moduledef);
+#else
+    PyObject *module = Py_InitModule3("minRMSD_metric", kmeansMethods, "");
+#endif
+    struct module_state *st = GETSTATE(module);
+
+    if (module == NULL)
+        INITERROR;
+
+    st->error = PyErr_NewException("minRMSD_metric.Error", NULL, NULL);
+    if (st->error == NULL) {
+        Py_DECREF(module);
+        INITERROR;
+    }
+
+#if PY_MAJOR_VERSION >= 3
+    return module;
+#endif
+}
+
 #ifdef __cplusplus
 }
 #endif
