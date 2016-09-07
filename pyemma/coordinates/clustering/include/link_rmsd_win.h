@@ -29,7 +29,7 @@ distance_fptr load_minRMSD_distance() {
  char* err;
  void* minRMSD_metric;
  minRMSD_metric = load_minRMSD_lib();
- p = (distance_fptr) GetProcAddress(minRMSD_metric, 'minRMSD_distance');
+ p = (distance_fptr) GetProcAddress(minRMSD_metric, "minRMSD_distance");
 
  if (!p ) { printf("win: error during loading %s\n", GetLastError())}
 
