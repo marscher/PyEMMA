@@ -14,7 +14,7 @@ void* load_minRMSD_lib() {
     return NULL;
  }
 
- fn = "minRMSD_metric.pyd"
+ fn = "minRMSD_metric.pyd";
  abs_path = malloc((strlen(path) + strlen(fn) + 2)*sizeof(char));
  sprintf(abs_path, "%s/%s", path, fn);
  handle = LoadLibrary(abs_path);
