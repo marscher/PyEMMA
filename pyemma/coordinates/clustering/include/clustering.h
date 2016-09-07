@@ -80,7 +80,11 @@ static char ASSIGN_USAGE[] = "assign(chunk, centers, dtraj, metric)\n"\
 "This function uses the minRMSD implementation of mdtraj.";
 
 // metrics distance function pointer type:
+#ifdef _WIN32
+typedef float (__cdecl *distance_fptr)(float*, float*, size_t, float*, float*, float*);
+#else
 typedef float (*distance_fptr)(float*, float*, size_t, float*, float*, float*);
+#endif
 // euclidean metric
 float euclidean_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n, float *buffer_a, float *buffer_b, float*dummy);
 // minRMSD distance function, dynamically loaded
