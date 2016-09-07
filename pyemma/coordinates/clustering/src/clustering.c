@@ -24,7 +24,7 @@
     #include <omp.h>
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
     #include <link_rmsd_win.h>
 #else
     #include <link_rmsd_unix.h>
