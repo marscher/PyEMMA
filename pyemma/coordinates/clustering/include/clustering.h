@@ -80,18 +80,19 @@ static char ASSIGN_USAGE[] = "assign(chunk, centers, dtraj, metric)\n"\
 "This function uses the minRMSD implementation of mdtraj.";
 
 // metrics distance function pointer type:
-#ifdef _WIN32
-typedef float (__cdecl *distance_fptr)(float*, float*, size_t, float*, float*, float*);
-#else
-typedef float (*distance_fptr)(float*, float*, size_t, float*, float*, float*);
+#ifndef _WIN32
+#define __cdecl
 #endif
+typedef float (__cdecl *distance_fptr)(float*, float*, size_t, float*, float*, float*);
+typedef void (__cdecl *center_fptr) (float*, float*, const int, const int);
+
 // euclidean metric
 float euclidean_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n, float *buffer_a, float *buffer_b, float*dummy);
 // minRMSD distance function, dynamically loaded
-//distance_fptr minRMSD_distance;
-distance_fptr load_minRMSD_distance();
-int inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
-    const int N_centers, const int dim);
+distance_fptr minRMSD_distance;
+center_fptr inplace_center_and_trace_atom_major_cluster_centers;
+//distance_fptr load_minRMSD_distance();
+int init_minRMSD_metric();
 
 
 // assignment to cluster centers from python

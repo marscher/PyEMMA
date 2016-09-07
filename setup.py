@@ -126,7 +126,7 @@ def extensions():
                   include_dirs=[
                       np_inc,
                       'pyemma/coordinates/clustering/include'],
-                  extra_compile_args=['-std=c99'])
+                  extra_compile_args=['-std=c99',  '-g', '-O3', '-pg'])
 
     covar_module = \
         Extension('pyemma.coordinates.estimators.covar.covar_c.covartools',

@@ -58,7 +58,11 @@ static PyObject *cluster(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0)
         distance = euclidean_distance;
     else if(strcmp(metric,"minRMSD")==0) {
-        distance = load_minRMSD_distance();
+        distance = minRMSD_distance;
+        if (!distance) {
+            PyErr_SetString(PyExc_RuntimeError, "minRMSD not available.");
+            goto error;
+        }
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -235,6 +239,9 @@ PyMODINIT_FUNC initregspatial(void)
     // numpy support
     import_array();
 
+    // try to dynamically load minRMSD metric stuff
+    if (! minRMSD_distance)
+        init_minRMSD_metric();
 
 #if PY_MAJOR_VERSION >= 3
     return module;

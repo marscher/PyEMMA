@@ -4,8 +4,6 @@
 #include <clustering.h>
 #include <windows.h>
 
-typedef int (__cdecl *MYPROC)(LPWSTR);
-
 void* load_minRMSD_lib() {
  void* handle;
  char* path;
@@ -26,40 +24,26 @@ void* load_minRMSD_lib() {
 }
 
 
-distance_fptr load_minRMSD_distance() {
+distance_fptr load_minRMSD_distance(void* module) {
  distance_fptr p;
- char* err;
- void* minRMSD_metric;
- minRMSD_metric = load_minRMSD_lib();
- if (!minRMSD_metric) { printf("win: error during loading %s\n", GetLastError()); }
- p = (distance_fptr) GetProcAddress(minRMSD_metric, TEXT("minRMSD_distance"));
+ p = (distance_fptr) GetProcAddress(module, TEXT("minRMSD_distance_impl"));
 
  if (!p) { printf("win: error during loading %s\n", GetLastError()); }
 
  return p;
 }
 
-int inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
-    const int N_centers, const int dim) {
- char* err;
+center_fptr load_minRMSD_precenter(void* module) {
  typedef void (__cdecl *center_fptr) (float*, float*, const int, const int);
  center_fptr p;
- void* minRMSD_metric;
- minRMSD_metric = load_minRMSD_lib();
- if (! minRMSD_metric) {
-    return 1;
- }
 
- p = (center_fptr) GetProcAddress(minRMSD_metric, TEXT("inplace_center_and_trace_atom_major_cluster_centers_impl"));
+ p = (center_fptr) GetProcAddress(module, TEXT("inplace_center_and_trace_atom_major_cluster_centers_impl"));
  if (!p) {
   /* handle error, the symbol wasn't found */
   printf("error during loading: %s\n", GetLastError());
-  return 1;
- } else {
-  /* symbol found, its value is in s */
-  p(centers_precentered, traces_centers_p, N_centers, dim/3);
+  return NULL;
  }
- return 0;
+ return p;
 }
 
 #endif

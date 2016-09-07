@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-float minRMSD_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n,
+float minRMSD_distance_impl(float *SKP_restrict a, float *SKP_restrict b, size_t n,
                        float *SKP_restrict buffer_a, float *SKP_restrict buffer_b,
                        float *trace_a_precalc)
 {

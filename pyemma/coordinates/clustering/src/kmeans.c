@@ -105,7 +105,7 @@ static PyObject *cluster(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0) {
         distance = euclidean_distance;
     } else if(strcmp(metric,"minRMSD")==0) {
-        distance = load_minRMSD_distance();
+        distance = minRMSD_distance;
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -238,7 +238,7 @@ static PyObject* costFunction(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0) {
         distance = euclidean_distance;
     } else if(strcmp(metric,"minRMSD")==0) {
-        distance = load_minRMSD_distance();
+        distance = minRMSD_distance;
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -281,7 +281,7 @@ static PyObject* initCentersKMpp(PyObject *self, PyObject *args) {
     float *buffer_a, *buffer_b;
     void *arr_data;
     float *squared_distances;
-    float (*distance)(float*, float*, size_t, float*, float*, float*);
+    distance_fptr distance;
 
     ret_init_centers = Py_BuildValue("");
     py_callback_result = NULL;
@@ -336,7 +336,11 @@ static PyObject* initCentersKMpp(PyObject *self, PyObject *args) {
     if(strcmp(metric,"euclidean")==0) {
         distance = euclidean_distance;
     } else if(strcmp(metric,"minRMSD")==0) {
-        distance = load_minRMSD_distance();
+        distance = minRMSD_distance;
+        if (!distance) {
+            PyErr_SetString(PyExc_RuntimeError, "minRMSD not available.");
+            goto error;
+        }
         buffer_a = malloc(dim*sizeof(float));
         buffer_b = malloc(dim*sizeof(float));
         if(!buffer_a || !buffer_b) { PyErr_NoMemory(); goto error; }
@@ -618,7 +622,7 @@ PyInit_kmeans_clustering(void)
 #else // py2
 #define INITERROR return
 
-void initkmeans_clustering(void)
+PyMODINIT_FUNC initkmeans_clustering(void)
 #endif
 {
 #if PY_MAJOR_VERSION >= 3
@@ -638,6 +642,10 @@ void initkmeans_clustering(void)
     }
     // numpy support
     import_array();
+
+    // try to dynamically load minRMSD metric stuff
+    if (! minRMSD_distance)
+        init_minRMSD_metric();
 
 
 #if PY_MAJOR_VERSION >= 3

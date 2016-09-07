@@ -30,6 +30,30 @@
     #include <link_rmsd_unix.h>
 #endif
 
+// dynamically link the minRMSD_metric module, CALL ONLY ONCE!
+int init_minRMSD_metric() {
+    void* minRMSD_module;
+    printf("INIT CALLLLLLLLLLLEEEEEEEEED\n");
+    minRMSD_module = load_minRMSD_lib();
+    if (! minRMSD_module) {
+        return ASSIGN_ERR_MINRMSD_LOAD_FAILED;
+    }
+
+    minRMSD_distance = load_minRMSD_distance(minRMSD_module);
+    if (! minRMSD_distance) {
+        return ASSIGN_ERR_MINRMSD_LOAD_FAILED;
+    }
+
+    inplace_center_and_trace_atom_major_cluster_centers = load_minRMSD_precenter(minRMSD_module);
+
+    if (! inplace_center_and_trace_atom_major_cluster_centers) {
+        return ASSIGN_ERR_MINRMSD_LOAD_FAILED;
+    }
+
+    return 0;
+}
+
+
 float euclidean_distance(float *SKP_restrict a, float *SKP_restrict b, size_t n, float *buffer_a, float *buffer_b,
                          float* dummy)
 {
@@ -79,7 +103,7 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
             ret = ASSIGN_ERR_NO_MEMORY;
         }
     } else if(strcmp(metric, "minRMSD")==0) {
-        distance = load_minRMSD_distance();
+        distance = minRMSD_distance;
         centers_precentered = malloc(N_centers*dim*sizeof(float));
         trace_centers_p = malloc(N_centers*sizeof(float));
         dists = malloc(N_centers*sizeof(float));
@@ -91,18 +115,8 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
             memcpy(centers_precentered, centers, N_centers*dim*sizeof(float));
 
             /* Parallelize centering of cluster generators */
-            /* Note that this is already OpenMP-enabled */
-
-//                        for (j = 0; j < N_centers; ++j) {
-//                inplace_center_and_trace_atom_major(&centers_precentered[j*dim],
-//                                                    &trace_centers_p[j], 1, dim/3);
-//            }
-
-            if ((ret = inplace_center_and_trace_atom_major_cluster_centers(centers_precentered,
-                    trace_centers_p, N_centers, dim)) != 0) {
-                   ret = ASSIGN_ERR_MINRMSD_LOAD_FAILED;
-                   goto error;
-                }
+            inplace_center_and_trace_atom_major_cluster_centers(centers_precentered,
+                    trace_centers_p, N_centers, dim);
             centers = centers_precentered;
             }
     } else {
