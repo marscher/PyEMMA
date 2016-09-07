@@ -92,7 +92,17 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
 
             /* Parallelize centering of cluster generators */
             /* Note that this is already OpenMP-enabled */
-            inplace_center_and_trace_atom_major_cluster_centers(centers_precentered, trace_centers_p, N_centers, dim);
+
+//                        for (j = 0; j < N_centers; ++j) {
+//                inplace_center_and_trace_atom_major(&centers_precentered[j*dim],
+//                                                    &trace_centers_p[j], 1, dim/3);
+//            }
+
+            if ((ret = inplace_center_and_trace_atom_major_cluster_centers(centers_precentered,
+                    trace_centers_p, N_centers, dim)) != 0) {
+                   ret = ASSIGN_ERR_MINRMSD_LOAD_FAILED;
+                   goto error;
+                }
             centers = centers_precentered;
             }
     } else {
@@ -145,6 +155,7 @@ int c_assign(float *chunk, float *centers, npy_int32 *dtraj, char* metric,
         }
     }
 
+    error:
     /* Clean up global storage */
     if (dists) free(dists);
     if (centers_precentered) free(centers_precentered);

@@ -24,7 +24,8 @@ void* load_minRMSD_lib() {
 distance_fptr load_minRMSD_distance() {
  distance_fptr p;
  char* err;
- void* minRMSD_metric = load_minRMSD_lib();
+ void* minRMSD_metric;
+ minRMSD_metric = load_minRMSD_lib();
  p = (distance_fptr) dlsym(minRMSD_metric, "minRMSD_distance");
 
  if ((err = dlerror()) != NULL) {
@@ -38,21 +39,24 @@ distance_fptr load_minRMSD_distance() {
 }
 
 
-void inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
+int inplace_center_and_trace_atom_major_cluster_centers(float* centers_precentered, float* traces_centers_p,
     const int N_centers, const int dim) {
  char* err;
  typedef void (*center_fptr) (float*, float*, const int, const int);
  center_fptr p;
- void* minRMSD_metric = load_minRMSD_lib();
+ void* minRMSD_metric;
+ minRMSD_metric = load_minRMSD_lib();
 
  p = dlsym(minRMSD_metric, "inplace_center_and_trace_atom_major_cluster_centers_impl");
  if ((err = dlerror()) != NULL) {
   /* handle error, the symbol wasn't found */
   printf("error during loading: %s\n", err);
+  return 1;
  } else {
-  /* symbol found, its value is in s */
   p(centers_precentered, traces_centers_p, N_centers, dim/3);
  }
+
+ return 0;
 }
 
 
