@@ -31,6 +31,7 @@ distance_fptr load_minRMSD_distance() {
  char* err;
  void* minRMSD_metric;
  minRMSD_metric = load_minRMSD_lib();
+ if (!minRMSD_metric) { printf("win: error during loading %s\n", GetLastError()); }
  p = (distance_fptr) GetProcAddress(minRMSD_metric, TEXT("minRMSD_distance"));
 
  if (!p) { printf("win: error during loading %s\n", GetLastError()); }
@@ -45,8 +46,11 @@ int inplace_center_and_trace_atom_major_cluster_centers(float* centers_precenter
  center_fptr p;
  void* minRMSD_metric;
  minRMSD_metric = load_minRMSD_lib();
+ if (! minRMSD_metric) {
+    return 1;
+ }
 
- p = GetProcAddress(minRMSD_metric, TEXT("inplace_center_and_trace_atom_major_cluster_centers_impl"));
+ p = (center_fptr) GetProcAddress(minRMSD_metric, TEXT("inplace_center_and_trace_atom_major_cluster_centers_impl"));
  if (!p) {
   /* handle error, the symbol wasn't found */
   printf("error during loading: %s\n", GetLastError());
