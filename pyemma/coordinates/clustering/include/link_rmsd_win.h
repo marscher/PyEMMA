@@ -34,7 +34,6 @@ distance_fptr load_minRMSD_distance(void* module) {
 }
 
 center_fptr load_minRMSD_precenter(void* module) {
- typedef void (__cdecl *center_fptr) (float*, float*, const int, const int);
  center_fptr p;
 
  p = (center_fptr) GetProcAddress(module, TEXT("inplace_center_and_trace_atom_major_cluster_centers_impl"));

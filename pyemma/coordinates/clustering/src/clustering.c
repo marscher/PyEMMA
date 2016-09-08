@@ -33,7 +33,6 @@
 // dynamically link the minRMSD_metric module, CALL ONLY ONCE!
 int init_minRMSD_metric() {
     void* minRMSD_module;
-    printf("INIT CALLLLLLLLLLLEEEEEEEEED\n");
     minRMSD_module = load_minRMSD_lib();
     if (! minRMSD_module) {
         return ASSIGN_ERR_MINRMSD_LOAD_FAILED;
