@@ -21,6 +21,24 @@ from __future__ import absolute_import
 import mdtraj
 import numpy as np
 
+# TODO: future imports
+# from chainsaw.data.util.fileformat_registry import FileFormatRegistry
+# from ._base.datasource import DataSourceIterator, DataSource
+# from ._base.random_accessible import RandomAccessStrategy
+# from chainsaw.data.featurization.featurizer import MDFeaturizer
+# from chainsaw.data.util.traj_info_cache import TrajInfo
+# from chainsaw.util import patches
+# from chainsaw.util.annotators import fix_docs
+
+# TODO: replace with chainsaw.
+class FileFormatRegistry(object):
+    @classmethod
+    def register(cls, *args):
+        def dec(f):
+            return f
+        return dec
+
+
 from pyemma.coordinates.data._base.datasource import DataSourceIterator, DataSource
 from pyemma.coordinates.data._base.random_accessible import RandomAccessStrategy
 from pyemma.coordinates.data.featurization.featurizer import MDFeaturizer
@@ -28,12 +46,33 @@ from pyemma.coordinates.data.util.traj_info_cache import TrajInfo
 from pyemma.coordinates.util import patches
 from pyemma.util.annotators import deprecated, fix_docs
 
-
 __author__ = 'noe, marscher'
 __all__ = ['FeatureReader']
 
 
 @fix_docs
+@FileFormatRegistry.register(
+ # NOTE: explicitly removed PDB here, since we only use it to obtain topology info, not traj data.
+ '.arc',
+ '.binpos',
+ '.crd',
+ '.dcd',
+ '.dtr',
+ '.gro',
+ '.h5', '.hdf5',
+ '.inpcrd',
+ '.lammpstrj',
+ '.lh5',
+ '.mdcrd',
+ '.nc',
+ '.ncdf',
+ '.ncrst',
+ '.netcdf',
+ #'.restrt',
+ '.rst7',
+ '.trr', '.xtc',
+ '.xyz', '.xyz.gz'
+)
 class FeatureReader(DataSource):
     """
     Reads features from MD data.
@@ -402,7 +441,7 @@ class FeatureReaderIterator(DataSourceIterator):
         self._closed = False
 
     def _create_patched_iter(self, filename, skip=0, stride=1, atom_indices=None):
-        return patches.iterload(filename, chunk=self.chunksize, top=self._data_source.featurizer.topology,
+        return patches.iterload(filename, chunk=self.chunksize, top=self._data_source.topfile,
                                 skip=skip, stride=stride, atom_indices=atom_indices)
 
     def reset(self):
