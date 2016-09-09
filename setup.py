@@ -99,8 +99,9 @@ def extensions():
     np_inc = _np_inc()
 
     exts = []
+    on_windows = sys.platform.startswith('win')
 
-    lib_prefix = 'lib' if sys.platform.startswith('win') else ''
+    lib_prefix = 'lib' if on_windows else ''
 
     # this is NOT a importable python extension, but just a dynamic library.
     minrmsd_metric = \
@@ -122,7 +123,7 @@ def extensions():
                       'pyemma/coordinates/clustering/include',
                   ],
                   extra_compile_args=['-std=c99', '-g', '-O3', '-pg'],
-                  libraries=['dl'])
+                  libraries=['dl'] if not on_windows else [])
     kmeans_module = \
         Extension('pyemma.coordinates.clustering.kmeans_clustering',
                   sources=[
@@ -132,7 +133,7 @@ def extensions():
                       np_inc,
                       'pyemma/coordinates/clustering/include'],
                   extra_compile_args=['-std=c99',  '-g', '-O3', '-pg'],
-                  libraries=['dl'])
+                  libraries=['dl'] if not on_windows else [])
 
     covar_module = \
         Extension('pyemma.coordinates.estimators.covar.covar_c.covartools',
