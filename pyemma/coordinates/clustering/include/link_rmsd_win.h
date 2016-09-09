@@ -7,18 +7,13 @@
 void* load_minRMSD_lib() {
  void* handle;
  char* path;
- char* fn;
- char* abs_path;
  path = getenv("PYEMMA_CLUSTERING_LD");
  if (! path) {
     printf("set the correct path of PYEMMA_CLUSTERING_LD to point to the directory of the minRMSD_metric lib.\n");
     return NULL;
  }
 
- fn = "minRMSD_metric.pyd";
- abs_path = malloc((strlen(path) + strlen(fn) + 2)*sizeof(char));
- sprintf(abs_path, "%s/%s", path, fn);
- handle = LoadLibrary(abs_path);
+ handle = LoadLibrary(path);
  free(abs_path);
  return handle;
 }

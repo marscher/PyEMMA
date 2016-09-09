@@ -13,11 +13,8 @@ void* load_minRMSD_lib() {
     return NULL;
  }
 
- char* fn = "minRMSD_metric.so";
- char* abs_path = malloc((strlen(path) + strlen(fn) + 2)*sizeof(char));
- sprintf(abs_path, "%s/%s", path, fn);
- handle = dlopen(abs_path, RTLD_LAZY|RTLD_GLOBAL);
- free(abs_path);
+ printf("trying to open: %s\n", path);
+ handle = dlopen(path, RTLD_LAZY|RTLD_GLOBAL);
  return handle;
 }
 
