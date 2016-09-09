@@ -41,6 +41,7 @@ from .uniform_time import UniformTimeClustering
 
 def _setup_minrmsd_metric():
     # setup path for dynamic linking of minRMSD metric
+    print("called setup minrmsd metric")
     import os
     import pkg_resources
     from sysconfig import get_config_var
