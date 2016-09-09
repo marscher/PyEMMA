@@ -14,7 +14,6 @@ void* load_minRMSD_lib() {
  }
 
  handle = LoadLibrary(path);
- free(abs_path);
  return handle;
 }
 
