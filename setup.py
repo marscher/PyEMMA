@@ -62,6 +62,10 @@ except ImportError as ie:
     print(getSetuptoolsError())
     sys.exit(23)
 
+
+class _PlainSharedLibrary(Extension):
+    """A shared lib without linkage to Python."""
+
 ###############################################################################
 # Extensions
 ###############################################################################
@@ -100,13 +104,13 @@ def extensions():
 
     # this is NOT a importable python extension, but just a dynamic library.
     minrmsd_metric = \
-        Extension('pyemma.coordinates.clustering.minRMSD_metric',
+        _PlainSharedLibrary('pyemma.coordinates.clustering.minRMSD_metric',
                   sources=['pyemma/coordinates/clustering/src/minRMSD.c'],
                   include_dirs=[np_inc, 'pyemma/coordinates/clustering/include',
                                 mdtraj.capi()['include_dir']],
                   library_dirs=[mdtraj.capi()['lib_dir']],
                   libraries=[lib_prefix + 'theobald'],
-                  extra_compile_args=['-std=c99', '-g', '-O3', '-pg'])
+                  extra_compile_args=['-std=c99', '-g', '-O3', '-pg', '-shared'])
 
     regspatial_module = \
         Extension('pyemma.coordinates.clustering.regspatial',
@@ -117,7 +121,8 @@ def extensions():
                       np_inc,
                       'pyemma/coordinates/clustering/include',
                   ],
-                  extra_compile_args=['-std=c99', '-g', '-O3', '-pg'])
+                  extra_compile_args=['-std=c99', '-g', '-O3', '-pg'],
+                  libraries=['dl'])
     kmeans_module = \
         Extension('pyemma.coordinates.clustering.kmeans_clustering',
                   sources=[
@@ -126,7 +131,8 @@ def extensions():
                   include_dirs=[
                       np_inc,
                       'pyemma/coordinates/clustering/include'],
-                  extra_compile_args=['-std=c99',  '-g', '-O3', '-pg'])
+                  extra_compile_args=['-std=c99',  '-g', '-O3', '-pg'],
+                  libraries=['dl'])
 
     covar_module = \
         Extension('pyemma.coordinates.estimators.covar.covar_c.covartools',
@@ -188,6 +194,21 @@ def get_cmdclass():
             return sdist_class.run(self)
 
     versioneer_cmds['sdist'] = sdist
+
+    from setuptools.command.build_ext import build_ext
+
+    class handle_plain_shared_library(build_ext):
+        def __init__(self,*args,**kwargs):
+            build_ext.__init__(self, *args, **kwargs)
+        def get_libraries(self, ext):
+            """ just use declared libraries (avoid Python linkage under Windoze. """
+            return ext.libraries
+
+        def get_export_symbols(self, ext):
+            return
+
+    versioneer_cmds['build_ext'] = handle_plain_shared_library
+
 
     return versioneer_cmds
 
