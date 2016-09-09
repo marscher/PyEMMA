@@ -7,7 +7,7 @@ import re
 
 src_dir = os.getenv('SRC_DIR')
 
-test_pkg = 'pyemma'
+test_pkg = 'pyemma.coordinates.tests.test_assign'
 cover_pkg = test_pkg
 
 # matplotlib headless backend
@@ -34,7 +34,7 @@ def coverage_report():
     with open(dest, 'w+') as fh:
        fh.write(data)
 
-nose_run = "nosetests {test_pkg} -vv" \
+nose_run = "nosetests {test_pkg} -s -vv --noexe" \
            " --with-coverage --cover-inclusive --cover-package={cover_pkg}" \
            " --with-doctest --doctest-options=+NORMALIZE_WHITESPACE,+ELLIPSIS" \
            .format(test_pkg=test_pkg, cover_pkg=cover_pkg).split(' ')
