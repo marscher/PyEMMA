@@ -43,4 +43,5 @@ class TestItsPlot(unittest.TestCase):
         msm_obj = pyemma.msm.MaximumLikelihoodMSM()
         msm_obj.estimate(dtrajs)
         ck = msm_obj.cktest(3)
+        ck.estimate(dtrajs)
         plot_cktest(ck)
