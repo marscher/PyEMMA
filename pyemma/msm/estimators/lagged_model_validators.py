@@ -92,9 +92,14 @@ class LaggedModelValidator(Estimator, ProgressReporter):
 
     def _estimate(self, data):
         data = types.ensure_dtraj_list(data)
+        from pyemma.msm.estimators._dtraj_stats import DiscreteTrajectoryStats
+        dt = DiscreteTrajectoryStats(data)
+        if dt.dtrajs_hash != self.test_estimator._dtrajs_hash:
+            raise ValueError("Could perform test for unknown discrete trajectories. "
+                             "Please use the same 'dtrajs' argument, you used for estimating this {} class"
+                             .format(self.test_estimator))
         # set mlags
-        maxlength = np.max([len(dtraj) for dtraj in data])
-        maxmlag = int(math.floor(maxlength / self.test_estimator.lag))
+        maxmlag = int(math.floor(dt.max_length / self.test_estimator.lag))
         mlags = self.mlags
         if self.mlags is None:
             mlags = maxmlag

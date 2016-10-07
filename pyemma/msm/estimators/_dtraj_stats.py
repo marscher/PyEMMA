@@ -188,6 +188,11 @@ class DiscreteTrajectoryStats(object):
         """
         return self._hist
 
+    @property
+    def max_length(self):
+        """ Maximum length of discrete trajectories."""
+        return np.max((len(dtraj) for dtraj in self._dtrajs))
+
     # ==================================
     # Estimated properties
     # ==================================
