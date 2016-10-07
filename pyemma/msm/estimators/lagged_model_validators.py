@@ -69,7 +69,7 @@ class LaggedModelValidator(Estimator, ProgressReporter):
             how many jobs to use during calculation
 
         show_progress : bool, default=True
-            Show progressbars for calculation?
+            Show progress bars for calculation?
 
         """
         # set model and estimator

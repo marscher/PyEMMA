@@ -224,6 +224,9 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
                                   'inefficient or unfeasible in terms of both runtime and memory consumption. '
                                   'Consider using sparse=True.')
 
+        # remember dtrajs fingerprint
+        self._dtrajs_hash = dtrajstats.dtrajs_hash
+
         # count lagged
         dtrajstats.count_lagged(self.lag, count_mode=self.count_mode)
 
@@ -528,12 +531,16 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
         """
         self._check_is_estimated()
         dtrajs = _types.ensure_dtraj_list(dtrajs)
+        dt = _DiscreteTrajectoryStats(dtrajs)
+        if not dt.dtrajs_hash == self._dtrajs_hash:
+            raise ValueError("Could not assign weights to unknown discrete trajectories. "
+                             "Please use the same 'dtrajs' argument, you used for estimating this {} class"
+                             .format(self))
         # compute stationary distribution, expanded to full set
         statdist_full = _np.zeros([self._nstates_full])
         statdist_full[self.active_set] = self.stationary_distribution
         # histogram observed states
-        import msmtools.dtraj as msmtraj
-        hist = msmtraj.count_states(dtrajs)
+        hist = self._hist
         # simply read off stationary distribution and accumulate total weight
         W = []
         wtot = 0.0

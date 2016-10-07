@@ -23,9 +23,28 @@ Created on 28.10.2013
 '''
 from __future__ import absolute_import
 from numpy.testing import assert_allclose as assert_allclose_np
+from six import PY3
 
 __all__ = ['assert_allclose',
            ]
+
+if PY3:
+    def _hash_numpy_array(x):
+        hash_value = hash(x.shape)
+        hash_value ^= hash(x.strides)
+        hash_value ^= hash(x.data.tobytes())
+        return hash_value
+else:
+    def _hash_numpy_array(x):
+        writeable = x.flags.writeable
+        try:
+            x.flags.writeable = False
+            hash_value = hash(x.shape)
+            hash_value ^= hash(x.strides)
+            hash_value ^= hash(x.data)
+        finally:
+            x.flags.writeable = writeable
+        return hash_value
 
 
 def assert_allclose(actual, desired, rtol=1.e-5, atol=1.e-8,

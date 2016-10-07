@@ -163,11 +163,12 @@ def ensure_dtraj(dtraj):
                         'only list of integers or int-ndarrays are allowed. '
                         'Check type of %s' % repr(dtraj))
 
+
 def ensure_dtraj_list(dtrajs):
     r"""Makes sure that dtrajs is a list of discrete trajectories (array of int)
 
     """
-    if isinstance(dtrajs, list):
+    if isinstance(dtrajs, (list, tuple)):
         # elements are ints? then wrap into a list
         if is_list_of_int(dtrajs):
             return [np.array(dtrajs, dtype=int)]
@@ -177,6 +178,7 @@ def ensure_dtraj_list(dtrajs):
             return dtrajs
     else:
         return [ensure_dtraj(dtrajs)]
+
 
 def ensure_int_vector(I, require_order = False):
     """Checks if the argument can be converted to an array of ints and does that.

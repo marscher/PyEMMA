@@ -53,6 +53,19 @@ class DiscreteTrajectoryStats(object):
         # not yet estimated
         self._counted_at_lag = False
 
+    @property
+    def dtrajs_hash(self):
+        """ finger print of the discrete trajectories.
+        Returns
+        -------
+        hash : int
+            a finger print of the discrete trajectories.
+        """
+        from pyemma.util.numeric import _hash_numpy_array
+        from functools import reduce
+        from operator import xor
+        # concatenate numpy hashes with xor
+        return reduce(xor, (_hash_numpy_array(x) for x in self._dtrajs))
 
     def count_lagged(self, lag, count_mode='sliding'):
         r""" Counts transitions at given lag time
