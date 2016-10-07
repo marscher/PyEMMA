@@ -79,7 +79,6 @@ class TestMSMSimple(unittest.TestCase):
 
     def test_MSM(self):
         msm = estimate_markov_model(self.dtraj, self.tau)
-        assert_allclose(self.dtraj, msm.discrete_trajectories_full[0])
         self.assertEqual(self.tau, msm.lagtime)
         assert_allclose(self.lcc_MSM, msm.largest_connected_set)
         self.assertTrue(np.allclose(self.Ccc_MSM.toarray(), msm.count_matrix_active))
@@ -90,7 +89,6 @@ class TestMSMSimple(unittest.TestCase):
 
     def test_MSM_sparse(self):
         msm = estimate_markov_model(self.dtraj, self.tau, sparse=True)
-        assert_allclose(self.dtraj, msm.discrete_trajectories_full[0])
         self.assertEqual(self.tau, msm.lagtime)
         assert_allclose(self.lcc_MSM, msm.largest_connected_set)
         self.assertTrue(np.allclose(self.Ccc_MSM.toarray(), msm.count_matrix_active.toarray()))
@@ -98,6 +96,7 @@ class TestMSMSimple(unittest.TestCase):
         self.assertTrue(np.allclose(self.P_MSM.toarray(), msm.transition_matrix.toarray()))
         assert_allclose(self.mu_MSM, msm.stationary_distribution)
         assert_allclose(self.ts[1:], msm.timescales(self.k - 1))
+
 
 class TestMSMRevPi(unittest.TestCase):
     r"""Checks if the MLMSM correctly handles the active set computation
@@ -278,32 +277,6 @@ class TestMSMDoubleWell(unittest.TestCase):
         self._count_matrix_full(self.msmrev_sparse)
         self._count_matrix_full(self.msmrevpi_sparse)
         self._count_matrix_full(self.msm_sparse)
-
-    def _discrete_trajectories_full(self, msm):
-        assert (np.all(self.dtraj == msm.discrete_trajectories_full[0]))
-
-    def test_discrete_trajectories_full(self):
-        self._discrete_trajectories_full(self.msmrev)
-        self._discrete_trajectories_full(self.msmrevpi)
-        self._discrete_trajectories_full(self.msm)
-        self._discrete_trajectories_full(self.msmrev_sparse)
-        self._discrete_trajectories_full(self.msmrevpi_sparse)
-        self._discrete_trajectories_full(self.msm_sparse)
-
-    def _discrete_trajectories_active(self, msm):
-        dta = msm.discrete_trajectories_active
-        # HERE
-        assert (len(dta) == 1)
-        # HERE: states are shifted down from the beginning, because early states are missing
-        assert (dta[0][0] < self.dtraj[0])
-
-    def test_discrete_trajectories_active(self):
-        self._discrete_trajectories_active(self.msmrev)
-        self._discrete_trajectories_active(self.msmrevpi)
-        self._discrete_trajectories_active(self.msm)
-        self._discrete_trajectories_active(self.msmrev_sparse)
-        self._discrete_trajectories_active(self.msmrevpi_sparse)
-        self._discrete_trajectories_active(self.msm_sparse)
 
     def _timestep(self, msm):
         assert (msm.timestep_model.startswith('1'))
@@ -853,11 +826,11 @@ class TestMSMDoubleWell(unittest.TestCase):
 
     def _active_state_indexes(self, msm):
         I = msm.active_state_indexes
-        assert (len(I) == msm.nstates)
+        assert len(I) == msm.nstates
         # compare to histogram
         import pyemma.util.discrete_trajectories as dt
 
-        hist = dt.count_states(msm.discrete_trajectories_full)
+        hist = dt.count_states(self.dtraj)
         # number of frames should match on active subset
         A = msm.active_set
         for i in range(A.shape[0]):
@@ -897,13 +870,16 @@ class TestMSMDoubleWell(unittest.TestCase):
         # must have the right size
         assert (len(ss) == msm.nstates)
         # must be correctly assigned
-        dtraj_active = msm.discrete_trajectories_active[0]
+        dtrajs_active = []
+        for dtraj in self.dtraj:
+            dtrajs_active.append(msm._full2active[dtraj])
+
         for i, samples in enumerate(ss):
             # right shape
-            assert (np.all(samples.shape == (nsample, 2)))
+            assert np.all(samples.shape == (nsample, 2))
             for row in samples:
-                assert (row[0] == 0)  # right trajectory
-                assert (dtraj_active[row[1]] == i)
+                assert row[0] == 0  # right trajectory
+                assert dtrajs_active[row[1]] == i
 
     def test_sample_by_state(self):
         self._sample_by_state(self.msmrev)
@@ -914,7 +890,7 @@ class TestMSMDoubleWell(unittest.TestCase):
         self._sample_by_state(self.msm_sparse)
 
     def _trajectory_weights(self, msm):
-        W = msm.trajectory_weights()
+        W = msm.trajectory_weights(dtrajs=self.dtraj)
         # should sum to 1
         assert (np.abs(np.sum(W[0]) - 1.0) < 1e-6)
 

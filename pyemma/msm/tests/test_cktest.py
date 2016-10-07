@@ -120,6 +120,7 @@ class TestCK_MSM(unittest.TestCase):
         self.K = K
         self.A = A
         self.B = B
+        self.dtraj = dtraj
 
         """Expected results"""
         self.p_MSM = p_MSM
@@ -129,7 +130,6 @@ class TestCK_MSM(unittest.TestCase):
     def tearDown(self):
         """Revert the state of the rng"""
         np.random.mtrand.set_state(self.state)
-
 
     def test_cktest(self):
         # introduce a (fake) third set in order to model incomplete partition.
@@ -141,11 +141,11 @@ class TestCK_MSM(unittest.TestCase):
                                 [0, 0, 1],
                                 [0, 0, 1]])
         ck = self.MSM.cktest(3, memberships=memberships)
+        ck.estimate(self.dtraj)
         p_MSM = np.vstack([ck.predictions[:, 0, 0], ck.predictions[:, 2, 2]]).T
         assert_allclose(p_MSM, self.p_MSM)
         p_MD = np.vstack([ck.estimates[:, 0, 0], ck.estimates[:, 2, 2]]).T
         assert_allclose(p_MD, self.p_MD)
-        #assert_allclose(eps_MD, self.eps_MD)
 
     def test_cktest_njobs(self):
         # introduce a (fake) third set in order to model incomplete partition.
@@ -158,6 +158,7 @@ class TestCK_MSM(unittest.TestCase):
                                 [0, 0, 1]])
         for nj in np.arange(2,5):
             ck = self.MSM.cktest(3, memberships=memberships, n_jobs=nj)
+            ck.estimate(self.dtraj)
             p_MSM = np.vstack([ck.predictions[:, 0, 0], ck.predictions[:, 2, 2]]).T
             assert_allclose(p_MSM, self.p_MSM)
             p_MD = np.vstack([ck.estimates[:, 0, 0], ck.estimates[:, 2, 2]]).T
@@ -177,6 +178,7 @@ class TestCK_AllEstimators(unittest.TestCase):
     def test_ck_msm(self):
         MLMSM = msm.estimate_markov_model([self.double_well_data.dtraj_T100K_dt10_n6good], 40)
         ck = MLMSM.cktest(2, mlags=[0,1,10])
+        ck.estimate(self.double_well_data.dtraj_T100K_dt10_n6good)
         estref = np.array([[[ 1.,          0.        ],
                             [ 0.,          1.        ]],
                            [[ 0.89806859,  0.10193141],
@@ -202,6 +204,7 @@ class TestCK_AllEstimators(unittest.TestCase):
         # also ensure that reversible bit does not flip during cktest
         assert BMSM.reversible
         ck = BMSM.cktest(2, mlags=[0,1,10])
+        ck.estimate(self.double_well_data.dtraj_T100K_dt10_n6good)
         assert BMSM.reversible
         estref = np.array([[[ 1.,          0.        ],
                             [ 0.,          1.        ]],
@@ -238,6 +241,7 @@ class TestCK_AllEstimators(unittest.TestCase):
     def test_its_hmsm(self):
         MLHMM = msm.estimate_hidden_markov_model([self.double_well_data.dtraj_T100K_dt10_n6good], 2, 10)
         ck = MLHMM.cktest(mlags=[0,1,10])
+        ck.estimate(self.double_well_data.dtraj_T100K_dt10_n6good)
         estref = np.array([[[ 1.,          0.        ],
                             [ 0.,          1.        ]],
                            [[ 0.98515058,  0.01484942],
@@ -261,6 +265,7 @@ class TestCK_AllEstimators(unittest.TestCase):
     def test_its_bhmm(self):
         BHMM = msm.bayesian_hidden_markov_model([self.double_well_data.dtraj_T100K_dt10_n6good], 2, 10)
         ck = BHMM.cktest(mlags=[0,1,10])
+        ck.estimate(self.double_well_data.dtraj_T100K_dt10_n6good)
         estref = np.array([[[ 1.,          0.        ],
                             [ 0.,          1.        ]],
                            [[ 0.98497185,  0.01502815],

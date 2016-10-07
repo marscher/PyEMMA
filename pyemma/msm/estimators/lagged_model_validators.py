@@ -76,20 +76,6 @@ class LaggedModelValidator(Estimator, ProgressReporter):
         self.test_model = model
         self.test_estimator = estimator
 
-        # set mlags
-        maxlength = np.max([len(dtraj) for dtraj in estimator.discrete_trajectories_full])
-        maxmlag = int(math.floor(maxlength / estimator.lag))
-        if mlags is None:
-            mlags = maxmlag
-        if types.is_int(mlags):
-            mlags = np.arange(mlags)
-        mlags = types.ensure_ndarray(mlags, ndim=1, kind='i')
-        if np.any(mlags > maxmlag):
-            mlags = mlags[np.where(mlags <= maxmlag)]
-            self.logger.warning('Changed mlags as some mlags exceeded maximum trajectory length.')
-        if np.any(mlags < 0):
-            mlags = mlags[np.where(mlags >= 0)]
-            self.logger.warning('Changed mlags as some mlags were negative.')
         self.mlags = mlags
 
         # set conf and error handling
@@ -105,6 +91,24 @@ class LaggedModelValidator(Estimator, ProgressReporter):
         self.show_progress = show_progress
 
     def _estimate(self, data):
+        data = types.ensure_dtraj_list(data)
+        # set mlags
+        maxlength = np.max([len(dtraj) for dtraj in data])
+        maxmlag = int(math.floor(maxlength / self.test_estimator.lag))
+        mlags = self.mlags
+        if self.mlags is None:
+            mlags = maxmlag
+        if types.is_int(mlags):
+            mlags = np.arange(mlags)
+        mlags = types.ensure_ndarray(mlags, ndim=1, kind='i')
+        if np.any(mlags > maxmlag):
+            mlags = mlags[np.where(mlags <= maxmlag)]
+            self.logger.warning('Changed mlags as some mlags exceeded maximum trajectory length.')
+        if np.any(mlags < 0):
+            mlags = mlags[np.where(mlags >= 0)]
+            self.logger.warning('Changed mlags as some mlags were negative.')
+        self.mlags = mlags
+
         # lag times
         self._lags = np.array(self.mlags) * self.test_estimator.lag
         pargrid = list(param_grid({'lag': self._lags}))
@@ -137,8 +141,7 @@ class LaggedModelValidator(Estimator, ProgressReporter):
             estimated_models = [None] + estimated_models
             estimators = [None] + estimators
 
-        for i in range(len(self.mlags)):
-            mlag = self.mlags[i]
+        for i, mlag in enumerate(self.mlags):
 
             # make a prediction using the current model
             self._pred.append(self._compute_observables(self.test_model, self.test_estimator, mlag))

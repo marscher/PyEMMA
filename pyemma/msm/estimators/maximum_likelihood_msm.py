@@ -256,9 +256,22 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
         self._C_active = dtrajstats.count_matrix(subset=self.active_set)
         self._nstates = self._C_active.shape[0]
 
+        # effective count matrix
+        Ceff_full = msmest.effective_count_matrix(dtrajs, self.lag)
+        from pyemma.util.linalg import submatrix
+        self._Ceff = submatrix(Ceff_full, self.active_set)
+
+        # histograms of states
+        from pyemma.util.discrete_trajectories import count_states
+        self._hist = count_states(dtrajs)
+        self._hist_active = self._hist[self.active_set]
+
+        import pyemma.util.discrete_trajectories as dt
+        self._active_state_indexes = dt.index_states(dtrajs, subset=self.active_set)
+
         # computed derived quantities
         # back-mapping from full to lcs
-        self._full2active = -1 * _np.ones((dtrajstats.nstates), dtype=int)
+        self._full2active = -1 * _np.ones(dtrajstats.nstates, dtype=int)
         self._full2active[self.active_set] = _np.arange(len(self.active_set))
 
         # restrict stationary distribution to active set
@@ -298,7 +311,6 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
 
         # Done. We set our own model parameters, so this estimator is
         # equal to the estimated model.
-        self._dtrajs_full = dtrajs
         self._connected_sets = msmest.connected_sets(self._C_full)
         self.set_model_params(P=P, pi=statdist_active, reversible=self.reversible,
                               dt_model=self.timestep_traj.get_scaled(self.lag))
@@ -373,8 +385,7 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
         A list of integer arrays with the original (unmapped) discrete trajectories:
 
         """
-        self._check_is_estimated()
-        return self._dtrajs_full
+        raise NotImplementedError()
 
     @property
     @alias('dtrajs_active')
@@ -385,13 +396,7 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
         Frames that are not in the connected set will be -1.
 
         """
-        self._check_is_estimated()
-        # compute connected dtrajs
-        self._dtrajs_active = []
-        for dtraj in self._dtrajs_full:
-            self._dtrajs_active.append(self._full2active[dtraj])
-
-        return self._dtrajs_active
+        raise NotImplementedError()
 
     @property
     def count_matrix_active(self):
@@ -427,11 +432,7 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
 
         """
         self._check_is_estimated()
-        import msmtools.estimation as msmest
-        Ceff_full = msmest.effective_count_matrix(self._dtrajs_full, self.lag)
-        from pyemma.util.linalg import submatrix
-        Ceff = submatrix(Ceff_full, self.active_set)
-        return Ceff
+        return self._Ceff
         # return self._C_active / float(self.lag)
 
     @property
@@ -467,18 +468,20 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
 
         """
         self._check_is_estimated()
-        from pyemma.util.discrete_trajectories import count_states
-
-        hist = count_states(self._dtrajs_full)
-        hist_active = hist[self.active_set]
-        return float(_np.sum(hist_active)) / float(_np.sum(hist))
+        return float(_np.sum(self._hist_active)) / float(_np.sum(self._hist))
 
     ################################################################################
     # For general statistics
     ################################################################################
 
-    def trajectory_weights(self):
+    def trajectory_weights(self, dtrajs):
         r"""Uses the MSM to assign a probability weight to each trajectory frame.
+
+        Parameters
+        ----------
+        dtrajs : list containing ndarrays(dtype=int) or ndarray(n, dtype=int) or :class:`pyemma.msm.util.dtraj_states.DiscreteTrajectoryStats`
+            discrete trajectories, stored as integer ndarrays (arbitrary size)
+            or a single ndarray for only one trajectory.
 
         This is a powerful function for the calculation of arbitrary observables in the trajectories one has
         started the analysis with. The stationary probability of the MSM will be used to reweigh all states.
@@ -524,16 +527,17 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
 
         """
         self._check_is_estimated()
+        dtrajs = _types.ensure_dtraj_list(dtrajs)
         # compute stationary distribution, expanded to full set
         statdist_full = _np.zeros([self._nstates_full])
         statdist_full[self.active_set] = self.stationary_distribution
         # histogram observed states
         import msmtools.dtraj as msmtraj
-        hist = 1.0 * msmtraj.count_states(self.discrete_trajectories_full)
+        hist = msmtraj.count_states(dtrajs)
         # simply read off stationary distribution and accumulate total weight
         W = []
         wtot = 0.0
-        for dtraj in self.discrete_trajectories_full:
+        for dtraj in dtrajs:
             w = statdist_full[dtraj] / hist[dtraj]
             W.append(w)
             wtot += _np.sum(w)
@@ -553,13 +557,7 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
         Ensures that the connected states are indexed and returns the indices
         """
         self._check_is_estimated()
-        try:  # if we have this attribute, return it
-            return self._active_state_indexes
-        except:  # didn't exist? then create it.
-            import pyemma.util.discrete_trajectories as dt
-
-            self._active_state_indexes = dt.index_states(self.discrete_trajectories_full, subset=self.active_set)
-            return self._active_state_indexes
+        return self._active_state_indexes
 
     def generate_traj(self, N, start=None, stop=None, stride=1):
         """Generates a synthetic discrete trajectory of length N and simulation time stride * lag time * N
@@ -751,7 +749,7 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
 
     def cktest(self, nsets, memberships=None, mlags=10, conf=0.95, err_est=False,
                n_jobs=1, show_progress=True):
-        """ Conducts a Chapman-Kolmogorow test.
+        """ Constructs a Chapman-Kolmogorow test Estimator.
 
         Parameters
         ----------
@@ -780,6 +778,9 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
         -------
         cktest : :class:`ChapmanKolmogorovValidator <pyemma.msm.ChapmanKolmogorovValidator>`
 
+        Notes
+        -----
+        The returned CK-estimator has to be fed the same discrete trajectories as this MSM estimator.
 
         References
         ----------
@@ -801,5 +802,4 @@ class MaximumLikelihoodMSM(_Estimator, _MSM):
             memberships = self.metastable_memberships
         ck = ChapmanKolmogorovValidator(self, self, memberships, mlags=mlags, conf=conf,
                                         n_jobs=n_jobs, err_est=err_est, show_progress=show_progress)
-        ck.estimate(self._dtrajs_full)
         return ck
