@@ -208,7 +208,7 @@ def number_of_states(dtrajs, only_used = False):
         bc = count_states(dtrajs)
         return np.count_nonzero(bc)
     else:
-        # all states wanted, included nonpopulated ones. return max + 1
+        # all states wanted, included non-populated ones. return max + 1
         imax = 0
         for dtraj in dtrajs:
             imax = max(imax, np.max(dtraj))
