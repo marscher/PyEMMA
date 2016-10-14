@@ -133,7 +133,13 @@ def extensions():
                   include_dirs=['pyemma/_ext/variational/covar_c/',
                                 np_inc,
                                 ],
-                  extra_compile_args=['-std=c99', '-O3'])
+                  extra_compile_args=['-std=c99', '-O0', '-ggdb',
+                                      '-fsanitize=bounds',
+                                      '-fsanitize=float-divide-by-zero',
+                                      '-fsanitize=float-cast-overflow',
+                                      '-fsanitize=integer-divide-by-zero',
+                                     # '-fbounds-checking',
+                                      ],)
 
     exts += [regspatial_module,
              kmeans_module,

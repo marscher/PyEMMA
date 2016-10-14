@@ -38,6 +38,17 @@ class Moments(object):
         ----------
         [1] http://i.stanford.edu/pub/cstr/reports/cs/tr/79/773/CS-TR-79-773.pdf
         """
+        assert np.all(np.isfinite(self.Mxy))
+        assert np.all(np.isfinite(other.Mxy))
+
+        assert np.all(np.isfinite(self.w))
+        assert np.all(np.isfinite(other.w))
+
+        assert np.all(np.isfinite(self.sx))
+        assert np.all(np.isfinite(self.sy))
+        assert np.all(np.isfinite(other.sx))
+        assert np.all(np.isfinite(other.sy))
+
         w1 = self.w
         w2 = other.w
         w = w1 + w2
@@ -52,6 +63,7 @@ class Moments(object):
             self.Mxy += other.Mxy + (w1 / (w2 * w)) * np.outer(dsx, dsy)
         else:
             self.Mxy += other.Mxy
+        assert np.all(np.isfinite(self.Mxy))
         return self
 
     @property
