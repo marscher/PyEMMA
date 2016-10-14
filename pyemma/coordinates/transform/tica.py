@@ -285,12 +285,15 @@ class TICA(StreamingTransformer):
         self.logger.debug("will use {} total frames for {}".
                           format(iterable.trajectory_lengths(self.stride, skip=self.skip), self.name))
 
-        it = iterable.iterator(lag=self.lag, return_trajindex=False, chunk=self.chunksize, skip=self.skip)
+        it = iterable.iterator(lag=self.lag, return_trajindex=True, chunk=self.chunksize, skip=self.skip)
         with it:
             self._progress_register(it._n_chunks, "calculate mean+cov", 0)
             self._init_covar(partial_fit, it._n_chunks)
-            for X, Y in it:
-                self._covar.add(X, Y)
+            for itraj, X, Y in it:
+                try:
+                    self._covar.add(X, Y)
+                except AssertionError as e:
+                    self.logger.exception("itraj={}", itraj, e)
                 # counting chunks and log of eta
                 self._progress_update(1, stage=0)
 
