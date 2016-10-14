@@ -293,7 +293,7 @@ class TICA(StreamingTransformer):
                 try:
                     self._covar.add(X, Y)
                 except AssertionError as e:
-                    self.logger.exception("itraj={}", itraj, e)
+                    self.logger.exception("itraj={}, pos={}".format(itraj, it._it.pos), exc_info=True)
                 # counting chunks and log of eta
                 self._progress_update(1, stage=0)
 
