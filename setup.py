@@ -126,18 +126,9 @@ def extensions():
                   library_dirs=[mdtraj.capi()['lib_dir']],
                   extra_compile_args=['-std=c99'])
 
-    covar_module = \
-        Extension('pyemma._ext.variational.covar_c.covartools',
-                  sources=['pyemma/_ext/variational/covar_c/covartools.pyx',
-                           'pyemma/_ext/variational/covar_c/_covartools.c'],
-                  include_dirs=['pyemma/_ext/variational/covar_c/',
-                                np_inc,
-                                ],
-                  extra_compile_args=['-std=c99', '-O3'])
-
+   
     exts += [regspatial_module,
              kmeans_module,
-             covar_module,
              ]
 
     if not USE_CYTHON:
@@ -223,7 +214,9 @@ metadata = dict(
                       'psutil>=3.1.1',
                       'decorator>=4.0.0',
                       'progress-reporter',
+                      'variational==dev',
                       ],
+    dependency_links=['https://github.com/markovmodel/variational/tarball/master#egg=variational-dev'],
     zip_safe=False,
 )
 
