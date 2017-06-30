@@ -21,6 +21,11 @@ environment:
       CONDA_PY: "36"
       ARCH: "64"
 
+    - MINICONDA_PYTHON: "C:\\Miniconda3-x64"
+      CONDA_PY: "36"
+      ARCH: "64"
+      CONDA_NPY: "113"
+
 install:
   - "SET PATH=%MINICONDA_PYTHON%;%MINICONDA_PYTHON%\\Scripts;%PATH%;"
 
@@ -40,5 +45,5 @@ test_script:
   - "%CMD_IN_ENV% conda build -q devtools/conda-recipe"
 
 #on_success:
-#  - devtools/ci/appveyor/after_success.bat  
+#  - devtools/ci/appveyor/after_success.bat
 
