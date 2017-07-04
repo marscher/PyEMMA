@@ -47,6 +47,7 @@ test:
   commands:
   # enable the reporting of Python warning
     - pip install pytest-warnings
+    - pip install git+https://github.com/pybee/pytest-circleci
   source_files:
     - conftest.py
     - setup.cfg
