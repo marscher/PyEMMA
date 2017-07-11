@@ -233,10 +233,10 @@ class _MSMEstimator(_Estimator, _MSM):
             test data (discrete trajectories).
         score_method : str
             Overwrite scoring method if desired. If `None`, the estimators scoring
-            method will be used. See __init__ for documentation.
+            method will be used. See __init__ for documention.
         score_k : str
             Overwrite scoring rank if desired. If `None`, the estimators scoring
-            rank will be used. See __init__ for documentation.
+            rank will be used. See __init__ for documention.
         score_method : str, optional, default='VAMP2'
             Overwrite scoring method to be used if desired. If `None`, the estimators scoring
             method will be used.
@@ -273,10 +273,12 @@ class _MSMEstimator(_Estimator, _MSM):
             self.score_k = score_k
 
         # determine actual scoring rank
-        if self.score_k is not None and self.score_k > self.nstates - 1:
+        if self.score_k is None:
+            self.score_k = self.nstates
+        if self.score_k > self.nstates:
             self.logger.warning('Requested scoring rank ' + str(self.score_k) +
                                 'exceeds number of MSM states. Reduced to score_k = ' + str(self.nstates))
-            self.score_k = self.nstates - 1  # limit to nstates
+            self.score_k = self.nstates  # limit to nstates
 
         # training data
         K = self.transition_matrix  # model
