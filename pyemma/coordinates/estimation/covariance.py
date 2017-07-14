@@ -286,9 +286,10 @@ class _ShuffleSplit(object):
 
     def split(self, covs):
         n = len(covs)
+        full = np.arange(n)
         for _ in range(self.n_splits):
-            train = np.random.choice(n, int(n / 2), replace=False)
-            test = np.array(list(set(list(np.arange(n))) - set(list(train))))
+            train = np.random.choice(full, int(n / 2), replace=False)
+            test = np.setdiff1d(full, train)
             yield train, test
 
 
