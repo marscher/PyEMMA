@@ -44,6 +44,19 @@ public:
 
 
     /**
+     * k-MC2 and AFK-MC2 seeding
+     * @param np_data (n,d)-shaped np.ndarray with data points
+     * @param chain_length length of the MCMC chain
+     * @param afkmc2 Whether to run AFK-MC2 (if True) or vanilla K-MC2 (if False)
+     * @param weights n-sized np.ndarray with weights of data points (default: uniform weights)
+     * @param random_seed
+     * @return centers (k, d)-shaped numpy.ndarray with cluster centers
+     */
+    np_array initCentersKMC2(const np_array& np_data, unsigned int chain_length,
+                             bool afkmc2, const np_array& weights,
+                             unsigned int random_seed) const;
+
+    /**
      * call back function to inform about progress
      * @param callback None or Python function.
      */

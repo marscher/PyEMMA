@@ -272,4 +272,80 @@ initCentersKMpp(const np_array& np_data, unsigned int random_seed) const {
     return ret_init_centers;
 }
 
+
+#include <algorithm>
+template<typename dtype>
+dtype KMeans<dtype>::initCentersKMC2(const np_array& np_data, unsigned int chain_length,
+                                     bool afkmc2, const np_array& np_weights, unsigned int random_seed) const {
+    size_t N_frames = np_data.shape(0);
+    std::vector<size_t> shape = {k, np_data.shape(1)};
+    np_array np_centers(shape);
+    auto centers = np_centers.unchecked();
+    auto data = np_data.unchecked<2>();
+    auto weights = np_weights.unchecked<1>();
+
+    // Sample first center and compute proposal
+    std::default_random_engine generator(random_seed);
+    if (weights.is_none()) {
+        std::fill(weights.data(), weights.data() + weights.size()*weights.itemsize(), 1);
+    } else {
+        //TODO: check probabilites sum up to one.
+    }
+    std::discrete_distribution<size_t> distribution(weights.data());
+
+    // draw indices of candidates.
+    std::vector<size_t> samples(N_frames);
+    for (size_t i = 0; i < N_frames; ++i) {
+        samples[i] = distribution(generator);
+    }
+
+    dtype dist;
+
+    np_array rel_row = np_data(random_state.choice(X.shape[0], p = weights / weights.sum()), :];
+    centers(0, 0) = rel_row;
+    std::vector<dtype> q;
+    if (afkmc2) {
+        std::vector<dtype> dists;
+        dists.resize(N_frames);
+        for(size_t i = 0; i < N_frames; ++i) {
+            dists[i] = metric->compute(&data(i, 0), &centers(0, 0)) * weights(i);
+        }
+        auto di = std::min(dists.begin(), dists.end());
+        //di = np.min(euclidean_distances(X, centers[0:1, :], squared=True), axis=1)*weights;
+        //q = di/std::sum(di) + weights/np.sum(weights); // Only the potentials
+        q = di / std::accumulate(di.begin(), dists.end())
+    } else {
+        q = np.copy(weights);
+    }
+    // Renormalize the proposal distribution
+    q /= np.sum(q);
+
+    for (int i= 0; i < k; ++i) {
+        // Draw the candidate indices
+        cand_ind = random_state.choice(X.shape[0], size = (chain_length), p = q).astype(np.intp);
+        // Extract the proposal probabilities
+        q_cand = q[cand_ind];
+
+        // Compute pairwise distances
+        dist = euclidean_distances(X[cand_ind, :], centers[0:(i + 1), :], squared = True);
+
+        // Compute potentials
+        p_cand = np.min(dist, axis = 1) * weights[cand_ind];
+
+        // Compute acceptance probabilities
+        rand_a = random_state.random_sample(size = (chain_length));
+        // Markov chain
+        for(int j = 0; j < q_cand.shape(0); ++j) {
+            cand_prob = p_cand[j] / q_cand[j];
+            if (j == 0 or curr_prob == 0.0 or cand_prob / curr_prob > rand_a[j]) {
+                // Init new chain             Metropolis-Hastings step
+                curr_ind = j;
+                curr_prob = cand_prob;
+            }
+            rel_row = np_chunk(cand_ind[curr_ind], :);
+            centers[i + 1, :] = rel_row;
+        }
+    }
+    return centers;
+}
 #endif //PYEMMA_KMEANS_BITS_H_H
