@@ -21,5 +21,6 @@ dependencies:
 
 test:
   override:
-    - conda build devtools/conda-recipe --numpy=112 --python=3.6
+    - "conda build devtools/conda-recipe --numpy=112 --python=3.6":
+         parallel: true
 
