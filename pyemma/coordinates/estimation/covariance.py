@@ -435,3 +435,10 @@ class Covariances(StreamingEstimator, ProgressReporter):
             self._progress_update(1, stage="cv")
         self._progress_force_finish(stage="cv")
         return np.array(scores)
+
+    def __getstate__(self):
+        res = {}
+        res.update(self.get_params())
+        res['covs_'] = self.covs_
+        res['n_covs_'] = self.n_covs_
+        return res
