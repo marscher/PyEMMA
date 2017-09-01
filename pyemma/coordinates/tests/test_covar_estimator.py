@@ -510,9 +510,9 @@ class TestCovPairs(unittest.TestCase):
     def test_reference_linear(self):
         block_size = 250
         full_rank_cov = covariance_lagged(self.data_gen, lag=block_size, ctt=True, remove_data_mean=False, bessel=True)
-        c00 = full_rank_cov.cov
-        c01 = full_rank_cov.cov_tau
-        c11 = full_rank_cov.cov_tau_tau
+        c00 = full_rank_cov.C00_
+        c01 = full_rank_cov.C0t_
+        c11 = full_rank_cov.Ctt_
 
         c = Covariances(3, tau=250, mode='linear', shift=0)
         c.estimate(self.data_gen)
@@ -525,9 +525,9 @@ class TestCovPairs(unittest.TestCase):
 
     def test_reference_sliding(self):
         full_rank_cov = covariance_lagged(self.data_gen, lag=50, ctt=True, remove_data_mean=False, bessel=True)
-        c00 = full_rank_cov.cov
-        c01 = full_rank_cov.cov_tau
-        c11 = full_rank_cov.cov_tau_tau
+        c00 = full_rank_cov.C00_
+        c01 = full_rank_cov.C0t_
+        c11 = full_rank_cov.Ctt_
 
         c = Covariances(3, tau=50, shift=0, mode='sliding')
         c.estimate(self.data_gen)

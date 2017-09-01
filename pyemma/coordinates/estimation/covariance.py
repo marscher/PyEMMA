@@ -20,6 +20,7 @@ from __future__ import absolute_import
 import numpy as np
 import numbers
 from math import log
+import random
 
 from pyemma.util.annotators import deprecated
 from pyemma.util.types import is_float_vector, ensure_float_vector
