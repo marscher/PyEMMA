@@ -31,7 +31,7 @@ class Iterable(six.with_metaclass(ABCMeta, ProgressReporter, Loggable)):
     def __init__(self, chunksize=1000):
         super(Iterable, self).__init__()
         self._default_chunksize = chunksize
-        if not self.default_chunksize or self.default_chunksize < 0:
+        if self.default_chunksize is None or self.default_chunksize < 0:
             raise ValueError("Chunksize of %s was provided, but has to be >= 0" % self.default_chunksize)
         self._in_memory = False
         self._mapping_to_mem_active = False
