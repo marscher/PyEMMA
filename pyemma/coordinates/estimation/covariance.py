@@ -18,20 +18,16 @@
 from __future__ import absolute_import
 
 import numbers
-from itertools import count
+import random
 from math import log
 
 import numpy as np
-
-from scipy.linalg import svd
-from scipy.sparse.linalg import svds
 
 from pyemma._base.progress import ProgressReporter
 from pyemma._ext.variational.estimators.running_moments import running_covar
 from pyemma.coordinates.data._base.streaming_estimator import StreamingEstimator
 from pyemma.util.metrics import vamp_score
 from pyemma.util.types import is_float_vector, ensure_float_vector
-from pyemma.util.linalg import mdot
 
 __all__ = ['LaggedCovariance']
 
@@ -305,11 +301,13 @@ class Covariances(StreamingEstimator, ProgressReporter):
 
     """
 
-    def __init__(self, n_covs, n_save=5, tau=5000, shift=10, stride=1, mode='sliding'):
+    def __init__(self, n_covs, n_save=5, tau=5000, shift=10, stride=1, mode='sliding', assign_to_covs='random'):
         super(Covariances, self).__init__()
         if mode not in ('sliding', 'linear'):
             raise ValueError('unsupported mode: %s' % mode)
-        self.set_params(mode=mode, tau=tau, shift=shift, n_covs=n_covs, n_save=n_save, stride=stride)
+        self.set_params(mode=mode, tau=tau, shift=shift, n_covs=n_covs, n_save=n_save,
+                        assign_to_covs=assign_to_covs,
+                        stride=stride)
 
     class _LinearCovariancesSplit(object):
 
@@ -368,10 +366,23 @@ class Covariances(StreamingEstimator, ProgressReporter):
 
         self._progress_register(splitter.n_chunks(iterable), "calculate covariances", 0)
 
-        idx = 0
-        for X, y in splitter.split(iterable):
-            self.covs_[idx % len(self.covs_)].add(X, y)
-            idx += 1
+        if self.assign_to_covs == 'round_robin':
+            idx = 0
+            def index():
+                nonlocal idx
+                res = idx % len(self.covs_)
+                idx += 1
+                return res
+
+        elif self.assign_to_covs == 'random':
+            def index():
+                return random.randint(0, len(self.covs_) - 1)
+        else:
+            raise NotImplementedError('unknown assign_to_covs mode: %s' %self.assign_to_covs)
+
+        for X, Y in splitter.split(iterable):
+            index_ = index()
+            self.covs_[index_].add(X, Y)
             self._progress_update(1, stage=0)
 
         self.covs_ = np.array(list(filter(lambda c: len(c.storage_XX.storage) > 0, self.covs_)))

@@ -551,6 +551,12 @@ class TestCovPairs(unittest.TestCase):
         c.estimate(self.data_gen)
         _ = c.score_cv()
 
+    def test_assign_to_covs(self):
+        c = Covariances(10, tau=50, shift=1, mode='sliding', n_save=1, assign_to_covs='round_robin')
+        c.estimate(self.data_gen)
+
+        c.estimate(self.data_gen, assign_to_covs='random')
+
 
 if __name__ == "__main__":
     unittest.main()
