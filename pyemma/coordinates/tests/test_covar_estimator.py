@@ -465,7 +465,7 @@ class TestCovarEstimatorWeightsList(unittest.TestCase):
 
         #from statsmodels.stats.weightstats import DescrStatsW
         #ds = DescrStatsW(data, weights=weights)
-        #np.testing.assert_allclose(cov.cov, ds.cov)
+        #np.testing.assert_allclose(cov.C00_, ds.cov)
 
     def test_non_matching_length(self):
         n = 100
