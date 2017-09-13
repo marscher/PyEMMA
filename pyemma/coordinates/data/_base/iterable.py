@@ -206,10 +206,10 @@ class Iterable(six.with_metaclass(ABCMeta, ProgressReporter, Loggable)):
         if self.in_memory and not self._mapping_to_mem_active:
             from pyemma.coordinates.data.data_in_memory import DataInMemory
             assert self._Y is not None
-            it = DataInMemory(self._Y)._create_iterator(skip=skip, chunk=chunk,
-                                                        stride=stride, return_trajindex=True)
+            it = DataInMemory(self._Y).iterator(skip=skip, chunk=chunk,
+                                                stride=stride, return_trajindex=True)
         else:
-            it = self._create_iterator(skip=skip, chunk=chunk, stride=stride, return_trajindex=True)
+            it = self.iterator(skip=skip, chunk=chunk, stride=stride, return_trajindex=True)
 
         with it:
             # allocate memory
