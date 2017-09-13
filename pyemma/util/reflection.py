@@ -19,9 +19,9 @@
 from __future__ import division, print_function, absolute_import
 
 import inspect
-import six
-#from six import string_types
 from collections import namedtuple
+
+import six
 
 __author__ = 'noe, marscher'
 
@@ -31,97 +31,62 @@ __author__ = 'noe, marscher'
 # https://github.com/django/django/pull/4846
 
 # Note an inconsistency between inspect.getargspec(func) and
-# inspect.signature(func). If `func` is a bound method, the latter does *not* 
+# inspect.signature(func). If `func` is a bound method, the latter does *not*
 # list `self` as a first argument, while the former *does*.
 # Hence cook up a common ground replacement: `getargspec_no_self` which
 # mimics `inspect.getargspec` but does not list `self`.
 #
 # This way, the caller code does not need to know whether it uses a legacy
 # .getargspec or bright and shiny .signature.
+ArgSpec = namedtuple('ArgSpec', ['args', 'varargs', 'keywords', 'defaults'])
 
-try:
-    # is it python 3.3 or higher?
-    inspect.signature
 
-    # Apparently, yes. Wrap inspect.signature
+def getargspec_no_self(func):
+    """inspect.getargspec replacement using inspect.signature.
 
-    ArgSpec = namedtuple('ArgSpec', ['args', 'varargs', 'keywords', 'defaults'])
+    inspect.getargspec is deprecated in python 3. This is a replacement
+    based on the (new in python 3.3) `inspect.signature`.
 
-    def getargspec_no_self(func):
-        """inspect.getargspec replacement using inspect.signature.
+    Parameters
+    ----------
+    func : callable
+        A callable to inspect
 
-        inspect.getargspec is deprecated in python 3. This is a replacement
-        based on the (new in python 3.3) `inspect.signature`.
+    Returns
+    -------
+    argspec : ArgSpec(args, varargs, varkw, defaults)
+        This is similar to the result of inspect.getargspec(func) under
+        python 2.x.
+        NOTE: if the first argument of `func` is self, it is *not*, I repeat
+        *not* included in argspec.args.
+        This is done for consistency between inspect.getargspec() under
+        python 2.x, and inspect.signature() under python 3.x.
+    """
+    sig = inspect.signature(func)
+    args = [
+        p.name for p in sig.parameters.values()
+        if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
+    ]
+    varargs = [
+        p.name for p in sig.parameters.values()
+        if p.kind == inspect.Parameter.VAR_POSITIONAL
+    ]
+    varargs = varargs[0] if varargs else None
+    varkw = [
+        p.name for p in sig.parameters.values()
+        if p.kind == inspect.Parameter.VAR_KEYWORD
+    ]
+    varkw = varkw[0] if varkw else None
+    defaults = [
+        p.default for p in sig.parameters.values()
+        if (p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD and
+           p.default is not p.empty)
+    ] or None
 
-        Parameters
-        ----------
-        func : callable
-            A callable to inspect
+    if args[0] == 'self':
+        args.pop(0)
 
-        Returns
-        -------
-        argspec : ArgSpec(args, varargs, varkw, defaults)
-            This is similar to the result of inspect.getargspec(func) under
-            python 2.x.
-            NOTE: if the first argument of `func` is self, it is *not*, I repeat
-            *not* included in argspec.args.
-            This is done for consistency between inspect.getargspec() under
-            python 2.x, and inspect.signature() under python 3.x.
-        """
-        sig = inspect.signature(func)
-        args = [
-            p.name for p in sig.parameters.values()
-            if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
-        ]
-        varargs = [
-            p.name for p in sig.parameters.values()
-            if p.kind == inspect.Parameter.VAR_POSITIONAL
-        ]
-        varargs = varargs[0] if varargs else None
-        varkw = [
-            p.name for p in sig.parameters.values()
-            if p.kind == inspect.Parameter.VAR_KEYWORD
-        ]
-        varkw = varkw[0] if varkw else None
-        defaults = [
-            p.default for p in sig.parameters.values()
-            if (p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD and
-               p.default is not p.empty)
-        ] or None
-
-        if args[0] == 'self':
-            args.pop(0)
-
-        return ArgSpec(args, varargs, varkw, defaults)
-
-except AttributeError:
-    # python 2.x
-    def getargspec_no_self(func):
-        """inspect.getargspec replacement for compatibility with python 3.x.
-
-        inspect.getargspec is deprecated in python 3. This wraps it, and
-        *removes* `self` from the argument list of `func`, if present.
-        This is done for forward compatibility with python 3.
-
-        Parameters
-        ----------
-        func : callable
-            A callable to inspect
-
-        Returns
-        -------
-        argspec : ArgSpec(args, varargs, varkw, defaults)
-            This is similar to the result of inspect.getargspec(func) under
-            python 2.x.
-            NOTE: if the first argument of `func` is self, it is *not*, I repeat
-            *not* included in argspec.args.
-            This is done for consistency between inspect.getargspec() under
-            python 2.x, and inspect.signature() under python 3.x.
-        """
-        argspec = inspect.getargspec(func)
-        if argspec.args[0] == 'self':
-            argspec.args.pop(0)
-        return argspec
+    return ArgSpec(args, varargs, varkw, defaults)
 
 
 def call_member(obj, f, *args, **kwargs):
