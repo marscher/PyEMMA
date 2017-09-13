@@ -35,25 +35,26 @@ class Model(object):
     superclasses. This class can be mixed with pyEMMA and sklearn Estimators.
 
     """
-
-    def _get_model_param_names(self):
+    @classmethod
+    def _get_model_param_names(cls):
         r"""Get parameter names for the model"""
         # fetch model parameters
-        if hasattr(self, 'set_model_params'):
-            set_model_param_method = getattr(self, 'set_model_params')
-            # introspect the constructor arguments to find the model parameters
-            # to represent
-            args, varargs, kw, default = getargspec_no_self(set_model_param_method)
-            if varargs is not None:
-                raise RuntimeError("pyEMMA models should always specify their parameters in the signature"
-                                   " of their set_model_params (no varargs). %s doesn't follow this convention."
-                                   % (self, ))
-            # Remove 'self'
-            # XXX: This is going to fail if the init is a staticmethod, but
-            # who would do this?
-            args.pop(0)
-            args.sort()
-            return args
+        if hasattr(cls, 'set_model_params'):
+            set_model_param_method = getattr(cls, 'set_model_params')
+            from inspect import signature
+            set_model_param_method_sig = signature(set_model_param_method)
+            # Consider the constructor parameters excluding 'self'
+            parameters = [p for p in set_model_param_method_sig.parameters.values()
+                          if p.name != 'self' and p.kind != p.VAR_KEYWORD]
+            for p in parameters:
+                if p.kind == p.VAR_POSITIONAL:
+                    raise RuntimeError("pyEMMA models should always specify their parameters in the signature"
+                                       " of their set_model_params (no varargs). "
+                                       " %s with set_model_params %s doesn't "
+                                       " follow this convention."
+                                       % (cls, set_model_param_method_sig))
+            # Extract and sort argument names excluding 'self'
+            return sorted([p.name for p in parameters])
         else:
             # No parameters known
             return []
