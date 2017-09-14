@@ -139,6 +139,7 @@ class BayesianMSM(_MLMSM, _SampledMSM, ProgressReporter):
             Preprint: http://arxiv.org/abs/1507.05990
 
         """
+        super(BayesianMSM, self).__init__()
         _MLMSM.__init__(self, lag=lag, reversible=reversible,
                         statdist_constraint=statdist_constraint,
                         count_mode=count_mode, sparse=sparse,

@@ -72,6 +72,7 @@ class LaggedModelValidator(Estimator, ProgressReporter):
             Show progressbars for calculation?
 
         """
+        super(LaggedModelValidator, self).__init__()
         # set model and estimator
         self.test_model = model
         self.test_estimator = estimator
@@ -301,8 +302,8 @@ class EigenvalueDecayValidator(LaggedModelValidator):
 
     def __init__(self, model, estimator, nits=1, mlags=None, conf=0.95,
                  exclude_stat=True, err_est=False, show_progress=True):
-        LaggedModelValidator.__init__(self, model, estimator, mlags=mlags,
-                                      conf=conf, show_progress=show_progress)
+        super(EigenvalueDecayValidator, self).__init__(self, model, estimator, mlags=mlags,
+                                                       conf=conf, show_progress=show_progress)
         self.nits = nits
         self.exclude_stat = exclude_stat
         self.err_est = err_est  # TODO: this is currently unused

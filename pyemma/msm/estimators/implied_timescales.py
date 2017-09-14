@@ -102,6 +102,7 @@ class ImpliedTimescales(Estimator, ProgressReporter, NJobsMixIn):
     """
     def __init__(self, estimator, lags=None, nits=None, n_jobs=1,
                  show_progress=True):
+        super(ImpliedTimescales, self).__init__()
         # initialize
         self.estimator = get_estimator(estimator)
         self.nits = nits

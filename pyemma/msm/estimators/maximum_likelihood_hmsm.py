@@ -141,6 +141,7 @@ class MaximumLikelihoodHMSM(_Estimator, _HMSM):
         self.timestep_traj = TimeUnit(dt_traj)
         self.accuracy = accuracy
         self.maxit = maxit
+        super(MaximumLikelihoodHMSM, self).__init__(P=None, pobs=None)
 
     #TODO: store_data is mentioned but not implemented or used!
     def _estimate(self, dtrajs):

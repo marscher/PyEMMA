@@ -137,6 +137,7 @@ class _MSMEstimator(_Estimator, _MSM):
 
         # sparse matrix computation wanted?
         self.sparse = sparse
+        super(_MSMEstimator, self).__init__(P=None)
 
         # store counting mode (lowercase)
         self.count_mode = count_mode

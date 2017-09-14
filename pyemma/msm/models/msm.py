@@ -168,8 +168,9 @@ class MSM(_Model):
 
             from scipy.sparse import issparse
             self.sparse = issparse(self._P)
-
-        # TODO: if spectral decomp etc. already has been computed, reset its state.
+            if hasattr(self, '_D'):
+                # if spectral decomposition already has been computed, reset its state.
+                del self._R, self._D, self._L
 
     @property
     @alias('is_reversible')
@@ -185,7 +186,7 @@ class MSM(_Model):
     @alias('is_sparse')
     def sparse(self):
         """Returns whether the MSM is sparse """
-        return self._sparse
+        return self._sparse if hasattr(self, '_sparse') else None
 
     @sparse.setter
     def sparse(self, value):
@@ -218,7 +219,7 @@ class MSM(_Model):
         if value is None:
             if self.sparse:
                 value = 10
-            else:
+            elif hasattr(self, '_nstates'):
                 value = self._nstates
 
         # set ncv for consistency
