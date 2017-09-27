@@ -216,9 +216,6 @@ class LaggedCovariance(StreamingEstimator, ProgressReporter):
                 self._progress_update(1, stage=0)
             if not partial_fit:
                 self._progress_force_finish(stage=0)
-                # work around bug, TODO: fix this properly in progress bar!!!
-                if len(self._prog_rep_progressbars) > 0:
-                    del self._prog_rep_progressbars[0]
 
         if partial_fit:
             self._used_data += len(it)
