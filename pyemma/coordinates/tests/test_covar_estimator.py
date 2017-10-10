@@ -516,7 +516,7 @@ class TestCovPairs(unittest.TestCase):
 
         c = Covariances(3, tau=250, mode='linear', shift=0)
         c.estimate(self.data_gen)
-        covs_c00, covs_c01, covs_c11 = c._aggregate(np.array([0, 1, 2]))
+        covs_c00, covs_c01, covs_c11, _, _ = c._aggregate(np.array([0, 1, 2]))
 
         tol = 1e-15
         np.testing.assert_allclose(covs_c00, c00, atol=tol, rtol=tol)
@@ -531,7 +531,7 @@ class TestCovPairs(unittest.TestCase):
 
         c = Covariances(3, tau=50, shift=0, mode='sliding')
         c.estimate(self.data_gen)
-        covs_c00, covs_c01, covs_c11 = c._aggregate(np.array([0, 1, 2]))
+        covs_c00, covs_c01, covs_c11, _, _ = c._aggregate(np.array([0, 1, 2]))
 
         tol = 1e-15
         np.testing.assert_allclose(covs_c00, c00, atol=tol, rtol=tol)

@@ -438,6 +438,10 @@ class Covariances(StreamingEstimator, ProgressReporter):
         c00 = sum(c.cov_XX(bessel=bessel) for c in covs)
         c01 = sum(c.cov_XY(bessel=bessel) for c in covs)
         c11 = sum(c.cov_YY(bessel=bessel) for c in covs)
+
+        mean_0 = sum(c.mean_X() for c in covs)
+        mean_t = sum(c.mean_Y() for c in covs)
+
         for idx, c in enumerate(covs):
             if len(c.storage_XX.storage) > 0:
                 c.storage_XX.storage[0].w = old_weights_xx[idx]
@@ -445,17 +449,32 @@ class Covariances(StreamingEstimator, ProgressReporter):
                 c.storage_XY.storage[0].w = old_weights_xy[idx]
             if len(c.storage_YY.storage) > 0:
                 c.storage_YY.storage[0].w = old_weights_yy[idx]
-        return c00, c01, c11
+        return c00, c01, c11, mean_0, mean_t
 
-    def score(self, test_covs, train_covs, k=5, scoring_method='vamp2'):
+    def score(self, test_covs, train_covs, k=5, scoring_method='VAMP2'):
         # split test and train test sets from input
-        c00_test, c01_test, c11_test = self._aggregate(test_covs)
-        c00_train, c01_train, c11_train = self._aggregate(train_covs)
-        return vamp_score(K=c01_train, C00_test=c00_test, C0t_test=c01_test, Ctt_test=c11_test,
-                          C00_train=c00_train, C0t_train=c01_train, Ctt_train=c11_train,
-                          k=k, score=scoring_method)
+        c00_test, c01_test, c11_test, mean_0_test, mean_t_test = self._aggregate(test_covs)
+        c00_train, c01_train, c11_train, mean_0_train, mean_t_train = self._aggregate(train_covs)
+        from pyemma.coordinates.transform.vamp import VAMPModel
+        epsilon = 1e-6
+        m_train = VAMPModel()
+        m_train.update_model_params(dim=k, epsilon=epsilon,
+                                    mean_0=mean_0_train,
+                                    mean_t=mean_t_train,
+                                    C00=c00_train,
+                                    C0t=c01_train,
+                                    Ctt=c11_train)
+        m_test = VAMPModel()
+        m_test.update_model_params(dim=k, epsilon=epsilon,
+                                   mean_0=mean_0_test,
+                                   mean_t=mean_t_test,
+                                   C00=c00_test,
+                                   C0t=c01_test,
+                                   Ctt=c11_test)
 
-    def score_cv(self, n=10, k=None, scoring_method='vamp2', splitter='shuffle'):
+        return m_train.score(test_model=m_test, score_method=scoring_method)
+
+    def score_cv(self, n=10, k=None, scoring_method='VAMP2', splitter='shuffle'):
         self._progress_register(n, "score cv", stage="cv")
         self._progress_update(0, stage="cv")
         scores = []
