@@ -218,6 +218,8 @@ class LaggedCovariance(StreamingEstimator, ProgressReporter):
                     raise MemoryError('Covariance matrix does not fit into memory. '
                                       'Input is too high-dimensional ({} dimensions). '.format(X.shape[1]))
                 self._progress_update(1, stage=0)
+            if not partial_fit:
+                self._progress_force_finish(stage=0)
 
         if partial_fit:
             self._used_data += len(it)
