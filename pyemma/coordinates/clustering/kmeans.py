@@ -28,6 +28,7 @@ import psutil
 import random
 import tempfile
 
+from pyemma._base.fixed_seed import FixedSeedMixIn
 from pyemma._base.progress.reporter import ProgressReporter
 from pyemma.coordinates.clustering.interface import AbstractClustering
 from pyemma.util.annotators import fix_docs
@@ -41,7 +42,7 @@ __all__ = ['KmeansClustering', 'MiniBatchKmeansClustering']
 
 
 @fix_docs
-class KmeansClustering(AbstractClustering, ProgressReporter):
+class KmeansClustering(AbstractClustering, ProgressReporter, FixedSeedMixIn):
     r"""k-means clustering"""
 
     def __init__(self, n_clusters, max_iter=5, metric='euclidean',
@@ -124,31 +125,6 @@ class KmeansClustering(AbstractClustering, ProgressReporter):
         if value not in valid:
             raise ValueError('invalid parameter "{}" for init_strategy. Should be one of {}'.format(value, valid))
         self._init_strategy = value
-
-    @property
-    def fixed_seed(self):
-        """ seed for random choice of initial cluster centers. Fix this to get reproducible results."""
-        return self._fixed_seed
-
-    @fixed_seed.setter
-    def fixed_seed(self, val):
-        from pyemma.util import types
-        if isinstance(val, bool) or val is None:
-            if val:
-                self._fixed_seed = 42
-            else:
-                self._fixed_seed = random.randint(0, 2**32-1)
-        elif types.is_int(val):
-            if val < 0 or val > 2**32-1:
-                self.logger.warn("seed has to be positive (or smaller than 2**32-1)."
-                                 " Seed will be chosen randomly.")
-                self.fixed_seed = False
-            else:
-                self._fixed_seed = val
-        else:
-            raise ValueError("fixed seed has to be bool or integer")
-
-        self.logger.debug("seed = %i", self._fixed_seed)
 
     @property
     def converged(self):
