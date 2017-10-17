@@ -22,13 +22,11 @@ import numbers
 from math import log
 import random
 
+from pyemma._base.fixed_seed import FixedSeedMixIn
 from pyemma.util.annotators import deprecated
-from pyemma.util.types import is_float_vector, ensure_float_vector
-from pyemma.coordinates.data._base.streaming_estimator import StreamingEstimator
 from pyemma._base.progress import ProgressReporter
 from pyemma._ext.variational.estimators.running_moments import running_covar
 from pyemma.coordinates.data._base.streaming_estimator import StreamingEstimator
-from pyemma.util.metrics import vamp_score
 from pyemma.util.types import is_float_vector, ensure_float_vector
 
 __all__ = ['LaggedCovariance']
@@ -314,7 +312,7 @@ class _ShuffleSplit(object):
             yield train, test
 
 
-class Covariances(StreamingEstimator, ProgressReporter):
+class Covariances(StreamingEstimator, ProgressReporter, FixedSeedMixIn):
     """
     Parameters
     ----------
@@ -326,13 +324,14 @@ class Covariances(StreamingEstimator, ProgressReporter):
 
     """
 
-    def __init__(self, n_covs, n_save=5, tau=5000, shift=10, stride=1, mode='sliding', assign_to_covs='random'):
+    def __init__(self, n_covs, n_save=5, tau=5000, shift=10, stride=1, mode='sliding', assign_to_covs='random',
+                 fixed_seed=False):
         super(Covariances, self).__init__()
         if mode not in ('sliding', 'linear'):
             raise ValueError('unsupported mode: %s' % mode)
         self.set_params(mode=mode, tau=tau, shift=shift, n_covs=n_covs, n_save=n_save,
                         assign_to_covs=assign_to_covs,
-                        stride=stride)
+                        stride=stride, fixed_seed=fixed_seed)
 
     class _LinearCovariancesSplit(object):
 
@@ -400,10 +399,14 @@ class Covariances(StreamingEstimator, ProgressReporter):
                 return res
 
         elif self.assign_to_covs == 'random':
+            random.seed(self.fixed_seed)
+            self._sample_inds = []
             def index():
-                return random.randint(0, len(self.covs_) - 1)
+                i = random.randint(0, len(self.covs_) - 1)
+                self._sample_inds.append(i)
+                return i
         else:
-            raise NotImplementedError('unknown assign_to_covs mode: %s' %self.assign_to_covs)
+            raise NotImplementedError('unknown assign_to_covs mode: %s' % self.assign_to_covs)
 
         for X, Y in splitter.split(iterable):
             index_ = index()
@@ -453,6 +456,7 @@ class Covariances(StreamingEstimator, ProgressReporter):
 
     def score(self, test_covs, train_covs, k=5, scoring_method='VAMP2'):
         # split test and train test sets from input
+        self.logger.info("test set: %s\t\t train set: %s", test_covs, train_covs)
         c00_test, c01_test, c11_test, mean_0_test, mean_t_test = self._aggregate(test_covs)
         c00_train, c01_train, c11_train, mean_0_train, mean_t_train = self._aggregate(train_covs)
         from pyemma.coordinates.transform.vamp import VAMPModel
