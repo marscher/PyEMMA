@@ -454,7 +454,7 @@ class Covariances(StreamingEstimator, ProgressReporter, FixedSeedMixIn):
                 c.storage_YY.storage[0].w = old_weights_yy[idx]
         return c00, c01, c11, mean_0, mean_t
 
-    def score(self, test_covs, train_covs, k=5, scoring_method='VAMP2'):
+    def score(self, train_covs, test_covs, k=5, scoring_method='VAMP2'):
         # split test and train test sets from input
         self.logger.info("test set: %s\t\t train set: %s", test_covs, train_covs)
         c00_test, c01_test, c11_test, mean_0_test, mean_t_test = self._aggregate(test_covs)
