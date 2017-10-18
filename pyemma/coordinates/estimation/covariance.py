@@ -454,7 +454,7 @@ class Covariances(StreamingEstimator, ProgressReporter, FixedSeedMixIn):
                 c.storage_YY.storage[0].w = old_weights_yy[idx]
         return c00, c01, c11, mean_0, mean_t
 
-    def score(self, train_covs, test_covs, k=5, scoring_method='VAMP2'):
+    def score(self, train_covs, test_covs, k=5, scoring_method='VAMP2', return_singular_values=False):
         # split test and train test sets from input
         self.logger.info("test set: %s\t\t train set: %s", test_covs, train_covs)
         c00_test, c01_test, c11_test, mean_0_test, mean_t_test = self._aggregate(test_covs)
@@ -475,13 +475,17 @@ class Covariances(StreamingEstimator, ProgressReporter, FixedSeedMixIn):
                                    C00=c00_test,
                                    C0t=c01_test,
                                    Ctt=c11_test)
+        score = m_train.score(test_model=m_test, score_method=scoring_method)
+        if return_singular_values:
+            return score, m_train.singular_values, m_test.singular_values
+        else:
+            return score
 
-        return m_train.score(test_model=m_test, score_method=scoring_method)
-
-    def score_cv(self, n=10, k=None, scoring_method='VAMP2', splitter='shuffle'):
+    def score_cv(self, n=10, k=None, scoring_method='VAMP2', splitter='shuffle', return_singular_values=False):
         self._progress_register(n, "score cv", stage="cv")
         self._progress_update(0, stage="cv")
         scores = []
+        singular_values = []
 
         if splitter == 'shuffle':
             splitter = _ShuffleSplit(n)
@@ -489,11 +493,20 @@ class Covariances(StreamingEstimator, ProgressReporter, FixedSeedMixIn):
             raise ValueError("splitter must be either \"split\" or splitter instance with split(X) method")
 
         for covs_train, covs_test in splitter.split(self.covs_):
-            score = self.score(covs_train, covs_test, k=k, scoring_method=scoring_method)
-            scores.append(score)
+            score = self.score(covs_train, covs_test, k=k, scoring_method=scoring_method,
+                               return_singular_values=return_singular_values)
+            if return_singular_values:
+                scores.append(score[0])
+                singular_values.append((score[1], score[2]))
+            else:
+                scores.append(score)
             self._progress_update(1, stage="cv")
         self._progress_force_finish(stage="cv")
-        return np.array(scores)
+        scores = np.array(scores)
+        if return_singular_values:
+            return scores, np.array(singular_values)
+
+        return scores
 
     def __getstate__(self):
         res = {}
