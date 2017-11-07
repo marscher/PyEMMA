@@ -32,6 +32,7 @@ PYBIND11_PLUGIN(_ext) {
                  py::arg("k"), py::arg("metric"), py::arg("dim"), py::arg("callback") = py::none())
             .def("cluster", &kmeans_f::cluster)
             .def("init_centers_KMpp", &kmeans_f::initCentersKMpp)
+            .def("init_centers_KMC", &kmeans_f::initCentersKMC)
             .def("set_callback", &kmeans_f::set_callback)
             .def("cost_function", &kmeans_f::costFunction);
     return m.ptr();

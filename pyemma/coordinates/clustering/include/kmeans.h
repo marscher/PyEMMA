@@ -51,6 +51,18 @@ public:
 
 
     /**
+     * kmeans++ initialisation
+     * @param np_data
+     * @param random_seed
+     * @param chain_len
+     * @param afkmc2
+     * @param weights
+     * @return init centers.
+     */
+    np_array initCentersKMC(const np_array& /*np_data*/, unsigned int /*random_seed*/, unsigned int /*chain len */,
+                            bool afkmc2, const np_array& weights) const;
+
+    /**
      * call back function to inform about progress
      * @param callback None or Python function.
      */
@@ -63,5 +75,6 @@ protected:
 };
 
 #include "bits/kmeans_bits.h"
+#include "bits/kmeans_pp_kmc.h"
 
 #endif //PYEMMA_KMEANS_H
