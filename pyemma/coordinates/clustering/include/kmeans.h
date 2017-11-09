@@ -60,7 +60,7 @@ public:
      * @return init centers.
      */
     np_array initCentersKMC(const np_array& /*np_data*/, unsigned int /*random_seed*/, unsigned int /*chain len */,
-                            bool afkmc2, const np_array& weights) const;
+                            bool afkmc2, const np_array&np_weights) const;
 
     /**
      * call back function to inform about progress
