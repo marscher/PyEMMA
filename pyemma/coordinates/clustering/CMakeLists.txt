@@ -7,22 +7,19 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../pybind11 ${CMAKE_CURRENT_B
 pybind11_add_module(kmeans src/clustering_module.cpp)
 
 # add mdtraj c-api.
-#find_package(PythonInterp)
-#if (PYTHON_EXECUTEABLE STREQUAL "")
-#    message(FATAL_ERROR "python not found")
-#endif()
+find_package(PythonInterp)
+if (! ${PYTHON_FOUND})
+    message(FATAL_ERROR no python)
+endif()
 
-message("python: ${PYTHON_EXECUTEABLE}")
-
-EXECUTE_PROCESS(COMMAND "${PYTHON_EXECUTEABLE}" -c "import mdtraj; print(mdtraj.capi()['include_dir'])"
-        RESULT_VARIABLE foo OUTPUT_VARIABLE MDTRAJ_INCLUDE)
-message("result: ${foo}")
+EXECUTE_PROCESS(COMMAND "${PYTHON_EXECUTABLE}" -c "import mdtraj; print(mdtraj.capi()['include_dir'])"
+        OUTPUT_VARIABLE MDTRAJ_INCLUDE)
 
 if (MDTRAJ_INCLUDE STREQUAL "")
     message(FATAL_ERROR "mdtraj lib not found")
 endif()
 
-EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTEABLE} -c "import mdtraj; print(mdtraj.capi()['lib_dir'])"
+EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "import mdtraj; print(mdtraj.capi()['lib_dir'])"
         OUTPUT_VARIABLE MDTRAJ_LIB)
 
 include_directories(include
