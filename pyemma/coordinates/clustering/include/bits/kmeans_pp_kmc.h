@@ -11,14 +11,17 @@ template<typename dtype>
 typename KMeans<dtype>::np_array KMeans<dtype>::
 KMeans::initCentersKMC(const KMeans::np_array &np_data, unsigned int seed,
                        unsigned int chain_len, bool afkmc2,
-                       const KMeans::np_array &np_weights) const {
+                       KMeans::np_array &np_weights) const {
     auto dim = np_data.shape(1);
     std::vector<std::size_t> shape = {k, dim};
     np_array np_centers(shape);
 
     if(np_weights.is_none()) {
-        np_weights = py::array_t<int>();
-        // TODO: assign ones...
+        np_weights = py::array_t<int>(np_data.shape(0));
+        auto buff = np_weights.mutable_unchecked();
+        for (std::size_t i = 0; i < np_weights.shape(0); ++i) {
+            buff(i) = i;
+        }
     }
 
     auto weights = np_weights.template unchecked<1>();
@@ -28,6 +31,7 @@ KMeans::initCentersKMC(const KMeans::np_array &np_data, unsigned int seed,
         indices.push_back(i);
     }
 
+    // TODO: check distribution
     std::discrete_distribution<std::size_t> dist(&weights(0), &weights(np_weights.shape(0)));
     std::mt19937 gen(seed);
 
