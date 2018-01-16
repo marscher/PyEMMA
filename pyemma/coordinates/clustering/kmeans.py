@@ -20,7 +20,6 @@ Created on 22.01.2015
 @author: clonker, marscher, noe
 """
 
-from __future__ import absolute_import
 
 import math
 import os
@@ -29,6 +28,7 @@ import random
 import tempfile
 
 from pyemma._base.progress.reporter import ProgressReporterMixin
+from pyemma._base.serialization.serialization import SerializableMixIn
 from pyemma.coordinates.clustering.interface import AbstractClustering
 from pyemma.util.annotators import fix_docs
 from pyemma.util.units import bytes_to_string
@@ -43,6 +43,8 @@ __all__ = ['KmeansClustering', 'MiniBatchKmeansClustering']
 @fix_docs
 class KmeansClustering(AbstractClustering, ProgressReporterMixin):
     r"""k-means clustering"""
+
+    __serialize_version = 0
 
     def __init__(self, n_clusters, max_iter=5, metric='euclidean',
                  tolerance=1e-5, init_strategy='kmeans++', fixed_seed=False,
@@ -225,24 +227,20 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
                 raise RuntimeError('Passed clustercenters do not match n_clusters: {} vs. {}'.
                                    format(len(self.clustercenters), self.n_clusters))
 
-        # run k-means with all the data
-        it = 0
-        prev_cost = 0
-        with self._progress_context():
-            while it < self.max_iter:
-                self.clustercenters = self._inst.cluster(self._in_memory_chunks, self.clustercenters, self.n_jobs)
-                cost = self._inst.cost_function(self._in_memory_chunks, self.clustercenters, self.n_jobs)
-                rel_change = np.abs(cost - prev_cost) / cost if cost != 0.0 else 0.0
-                prev_cost = cost
+        if self.show_progress:
+            callback = lambda: self._progress_update(1, stage=1)
+        else:
+            callback = None
 
-                if rel_change <= self.tolerance:
-                    self._converged = True
-                    self._logger.info("Cluster centers converged after %i steps.", it + 1)
-                    break
-                else:
-                    self._progress_update(1, stage=1)
-                it += 1
-            if not self._converged:
+        # run k-means with all the data
+        with self._progress_context(stage=1):
+            self.clustercenters, code, iterations = self._inst.cluster_loop(self._in_memory_chunks, self.clustercenters,
+                                                                            self.n_jobs, self.max_iter, self.tolerance,
+                                                                            callback)
+            if code == 0:
+                self._converged = True
+                self._logger.info("Cluster centers converged after %i steps.", iterations + 1)
+            else:
                 self._logger.info("Algorithm did not reach convergence criterion"
                                   " of %g in %i iterations. Consider increasing max_iter.",
                                   self.tolerance, self.max_iter)
@@ -275,15 +273,16 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
             self.n_clusters = min(int(math.sqrt(total_length)), 5000)
             self._logger.info("The number of cluster centers was not specified, "
                               "using min(sqrt(N), 5000)=%s as n_clusters." % self.n_clusters)
+        from pyemma.coordinates.data import DataInMemory
+        if not isinstance(self, MiniBatchKmeansClustering) and not isinstance(self.data_producer, DataInMemory):
+            n_chunks = self.data_producer.n_chunks(chunksize=self.chunksize, skip=self.skip, stride=self.stride)
+            self._progress_register(n_chunks, description="creating data array", stage='data')
+
         if self.init_strategy == 'kmeans++':
             self._progress_register(self.n_clusters,
                                     description="initialize kmeans++ centers", stage=0)
         self._progress_register(self.max_iter, description="kmeans iterations", stage=1)
         self._init_in_memory_chunks(total_length)
-        from pyemma.coordinates.data import DataInMemory
-        if not isinstance(self, MiniBatchKmeansClustering) and not isinstance(self.data_producer, DataInMemory):
-            n_chunks = self.data_producer.n_chunks(chunksize=self.chunksize, skip=self.skip, stride=self.stride)
-            self._progress_register(n_chunks, description="creating data array", stage='data')
 
         if self.init_strategy == 'uniform':
             # gives random samples from each trajectory such that the cluster centers are distributed percentage-wise
@@ -294,11 +293,7 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
                             math.ceil((traj_len / float(total_length)) * self.n_clusters)))
 
         from ._ext import kmeans as kmeans_mod
-        if self.init_strategy == 'kmeans++' and self.show_progress:
-            callback = lambda: self._progress_update(1, stage=0)
-        else:
-            callback = None
-        self._inst = kmeans_mod.Kmeans_f(self.n_clusters, self.metric, self.data_producer.ndim, callback)
+        self._inst = kmeans_mod.Kmeans_f(self.n_clusters, self.metric, self.data_producer.ndim)
 
         return stride
 
@@ -314,7 +309,12 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
                         new = np.vstack((self.clustercenters, X[l]))
                         self.clustercenters = new
         elif last_chunk and self.init_strategy == 'kmeans++':
-            self.clustercenters = self._inst.init_centers_KMpp(self._in_memory_chunks, self.fixed_seed, self.n_jobs)
+            if self.init_strategy == 'kmeans++' and self.show_progress:
+                callback = lambda: self._progress_update(1, stage=0)
+            else:
+                callback = None
+            self.clustercenters = self._inst.init_centers_KMpp(self._in_memory_chunks, self.fixed_seed, self.n_jobs,
+                                                               callback)
 
     def _collect_data(self, X, first_chunk, last_chunk):
         # beginning - compute
@@ -334,6 +334,8 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
 
 class MiniBatchKmeansClustering(KmeansClustering):
     r"""Mini-batch k-means clustering"""
+
+    __serialize_version = 0
 
     def __init__(self, n_clusters, max_iter=5, metric='euclidean', tolerance=1e-5, init_strategy='kmeans++',
                  batch_size=0.2, oom_strategy='memmap', fixed_seed=False, stride=None, n_jobs=None, skip=0,

@@ -15,7 +15,6 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from __future__ import absolute_import
 import warnings
 
 from decorator import decorator, decorate
@@ -39,7 +38,7 @@ def fix_docs(cls):
                                    if not name.startswith('_') and func.__doc__ is None}
 
     for name, func in public_undocumented_members.items():
-        for parent in cls.mro()[1:]:
+        for parent in cls.__mro__[1:]:
             parfunc = getattr(parent, name, None)
             if parfunc and getattr(parfunc, '__doc__', None):
                 if isinstance(func, property):
@@ -213,23 +212,3 @@ def deprecated(*optional_message):
         # actually got a message (or empty parenthesis)
         msg = optional_message[0] if len(optional_message) > 0 else ""
         return decorator(_deprecated)
-
-
-@decorator
-def estimation_required(func, *args, **kw):
-    """
-    Decorator checking the self._estimated flag in an Estimator instance, raising a value error if the decorated
-    function is called before estimator.estimate() has been called.
-
-    If mixed with a property-annotation, this annotation needs to come first in the chain of function calls, i.e.,
-
-    @property
-    @estimation_required
-    def func(self):
-        ....
-    """
-    self = args[0] if len(args) > 0 else None
-    if self and hasattr(self, '_estimated') and not self._estimated:
-        raise ValueError("Tried calling %s on %s which requires the estimator to be estimated."
-                         % (func.__name__, self.__class__.__name__))
-    return func(*args, **kw)

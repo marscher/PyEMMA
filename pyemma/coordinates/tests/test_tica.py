@@ -23,7 +23,6 @@ Created on 02.02.2015
 @author: marscher
 """
 
-from __future__ import absolute_import
 import unittest
 import os
 import pkg_resources
@@ -414,13 +413,18 @@ class TestTICAExtensive(unittest.TestCase):
         tica_obj = tica(lag=lag)
         from pyemma.util.testing_tools import MockLoggingHandler
         log_handler = MockLoggingHandler()
-        tica_obj._covar.logger.addHandler(log_handler)
-        for x in data:
-            tica_obj.partial_fit(x)
+        import logging
+        L = logging.getLogger('pyemma.coordinates.estimation.covariance')
+        L.addHandler(log_handler)
+        try:
+            for x in data:
+                tica_obj.partial_fit(x)
 
-        self.assertEqual(tica_obj._used_data, 20 - lag)
-        self.assertEqual(len(log_handler.messages['warning']), 1)
-        self.assertIn("longer than lag", log_handler.messages['warning'][0])
+            self.assertEqual(tica_obj._used_data, 20 - lag)
+            self.assertEqual(len(log_handler.messages['warning']), 1)
+            self.assertIn("longer than lag", log_handler.messages['warning'][0])
+        finally:
+            L.removeHandler(log_handler)
 
 
 class TestKoopman(unittest.TestCase):

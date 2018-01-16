@@ -22,7 +22,6 @@ Created on 18.02.2015
 @author: marscher
 '''
 
-from __future__ import absolute_import
 
 import numpy as np
 
@@ -61,6 +60,7 @@ class AssignCenters(AbstractClustering):
     >>> disc.parametrize() # doctest: +SKIP
 
     """
+    __serialize_version = 0
 
     def __init__(self, clustercenters, metric='euclidean', stride=1, n_jobs=None, skip=0):
         super(AssignCenters, self).__init__(metric=metric, n_jobs=n_jobs)

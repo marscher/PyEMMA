@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import absolute_import
 import unittest
 import numpy as np
 from pyemma.msm import bayesian_hidden_markov_model
@@ -319,6 +318,31 @@ class TestBHMMSpecialCases(unittest.TestCase):
         for strajs in hmm_bayes.sampled_trajs:
             assert strajs[0][0] == 2
             assert strajs[0][6] == 2
+
+    def test_initialized_bhmm(self):
+        import pyemma.datasets
+        import pyemma.msm
+
+        obs = pyemma.datasets.load_2well_discrete().dtraj_T100K_dt10
+
+        init_hmm = pyemma.msm.estimate_hidden_markov_model(obs, 2, 10)
+        bay_hmm = pyemma.msm.estimators.BayesianHMSM(nstates=init_hmm.nstates, lag=init_hmm.lag,
+                                                     stride=init_hmm.stride, init_hmsm=init_hmm)
+        bay_hmm.estimate(obs)
+
+        assert np.isclose(bay_hmm.stationary_distribution.sum(), 1)
+
+    def test_initialized_bhmm_newstride(self):
+        import pyemma.msm
+        obs = np.random.randint(0, 2, size=1000)
+
+        init_hmm = pyemma.msm.estimate_hidden_markov_model(obs, 2, 10)
+        bay_hmm = pyemma.msm.estimators.BayesianHMSM(nstates=init_hmm.nstates, lag=init_hmm.lag,
+                                                     stride='effective', init_hmsm=init_hmm)
+        bay_hmm.estimate(obs)
+
+        assert np.isclose(bay_hmm.stationary_distribution.sum(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

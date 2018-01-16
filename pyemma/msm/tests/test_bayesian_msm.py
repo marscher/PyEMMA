@@ -16,13 +16,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import absolute_import
 import unittest
 import numpy as np
-import scipy
 from pyemma.msm import bayesian_markov_model
-from os.path import abspath, join
-from os import pardir
 
 
 class TestBMSM(unittest.TestCase):

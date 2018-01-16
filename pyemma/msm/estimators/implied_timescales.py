@@ -23,12 +23,12 @@ Created on Jul 26, 2014
 @author: noe
 '''
 
-from __future__ import absolute_import, print_function
 
 import numpy as np
 
+from pyemma._base.serialization.serialization import SerializableMixIn
 from pyemma._base.parallel import NJobsMixIn
-from pyemma.util.annotators import estimation_required, alias, aliased
+from pyemma.util.annotators import alias, aliased
 
 from pyemma.util.statistics import confidence_interval
 from pyemma.util import types as _types
@@ -78,7 +78,11 @@ def _hash_dtrajs(dtraj_list):
 # TODO: Timescales should be assigned by similar eigenvectors rather than by order
 # TODO: when requesting too long lagtimes, throw a warning and exclude lagtime from calculation, but compute the rest
 @aliased
-class ImpliedTimescales(Estimator, ProgressReporterMixin, NJobsMixIn):
+class ImpliedTimescales(Estimator, ProgressReporterMixin, NJobsMixIn, SerializableMixIn):
+    __serialize_version = 0
+    __serialize_fields = ('_models', '_estimators', '_successful_lag_indexes',
+                         '_its', '_its_samples',
+                          )
     r"""Implied timescales for a series of lag times.
 
     Parameters
@@ -317,7 +321,6 @@ class ImpliedTimescales(Estimator, ProgressReporterMixin, NJobsMixIn):
         self._nits = int(value) if value is not None else None
 
     @property
-    @estimation_required
     def timescales(self):
         r"""Returns the implied timescale estimates
 
@@ -347,6 +350,8 @@ class ImpliedTimescales(Estimator, ProgressReporterMixin, NJobsMixIn):
         for every lag time
 
         """
+        if not self._estimated:
+            raise RuntimeError('you need to call fit() or estimate() first!')
         if process is None:
             return self._its[self._successful_lag_indexes, :]
         else:

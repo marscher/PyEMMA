@@ -20,7 +20,6 @@ Created on 11.04.2015
 @author: marscher
 """
 
-from __future__ import absolute_import
 
 import csv
 import os
@@ -28,6 +27,7 @@ from math import ceil
 
 import numpy as np
 
+from pyemma._base.serialization.serialization import SerializableMixIn
 from pyemma.coordinates.data._base.datasource import DataSourceIterator, DataSource
 from pyemma.coordinates.data.util.traj_info_cache import TrajInfo
 from pyemma.util.annotators import fix_docs
@@ -182,7 +182,7 @@ def _dialect_to_str(dialect):
 
 
 @fix_docs
-class PyCSVReader(DataSource):
+class PyCSVReader(DataSource, SerializableMixIn):
     r""" Reader for tabulated ASCII data
 
     This class uses numpy to interpret string data to array data.
@@ -216,6 +216,7 @@ class PyCSVReader(DataSource):
     For reading files with only one column, one needs to specify a delimter...
     """
     DEFAULT_OPEN_MODE = 'r'  # read in text-mode
+    __serialize_version = 0
 
     def __init__(self, filenames, chunksize=1000, delimiters=None, comments='#',
                  converters=None, **kwargs):
@@ -290,6 +291,7 @@ class PyCSVReader(DataSource):
         if self._delimiters[idx] is None:
             # use a sample of three lines
             sample = ''.join(fh.readline() for _ in range(3))
+            fh.seek(0)
             sniffer = csv.Sniffer()
             try:
                 dialect = sniffer.sniff(sample)
@@ -390,7 +392,7 @@ class PyCSVReader(DataSource):
         try:
             arr = np.array(line).astype(float)
         except ValueError as ve:
-            s = 'could not parse first line of data in file "%s"' % fh.name
+            s = 'could not parse first line of data [{ln}] in file "{f}"'.format(f=fh.name, ln=line)
             raise ValueError(s, ve)
         s = arr.squeeze().shape
         if len(s) == 1:
@@ -409,3 +411,8 @@ class PyCSVReader(DataSource):
             ndim = PyCSVReader._get_dimension(fh, dialect, skip)
 
         return TrajInfo(ndim, length, offsets)
+
+    def __reduce__(self):
+        # serialize only the constructor arguments.
+        return PyCSVReader, (self.filenames, self.chunksize,
+                             self._delimiters[0], self._comments[0])

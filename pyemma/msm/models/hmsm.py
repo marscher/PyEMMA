@@ -25,7 +25,6 @@ and provides them for later access.
 
 """
 
-from __future__ import absolute_import
 
 import numpy as _np
 
@@ -45,6 +44,7 @@ class HMSM(_MSM):
         Hidden Markov Model
 
     """
+    __serialize_version = 0
 
     def __init__(self, P, pobs, pi=None, dt_model='1 step'):
         """
@@ -80,6 +80,10 @@ class HMSM(_MSM):
         pi : ndarray(m), optional, default=None
             stationary or distribution. Can be optionally given in case if
             it was already computed, e.g. by the estimator.
+
+        reversible : bool, optional, default=None
+            whether P is reversible with respect to its stationary distribution.
+            If None (default), will be determined from P
 
         dt_model : str, optional, default='1 step'
             time step of the model

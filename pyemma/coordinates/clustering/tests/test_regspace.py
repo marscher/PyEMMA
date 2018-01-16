@@ -23,7 +23,6 @@ Created on 26.01.2015
 @author: marscher
 '''
 
-from __future__ import absolute_import
 import itertools
 import unittest
 
@@ -36,6 +35,8 @@ import pyemma.util.types as types
 
 
 class RandomDataSource(DataInMemory):
+
+    __serialize_version = 0
 
     def __init__(self, a=None, b=None, chunksize=100, n_samples=1000, dim=3):
         """
@@ -132,6 +133,13 @@ class TestRegSpaceClustering(unittest.TestCase):
             out = self.clustering.get_output()
             assert len(out) == self.clustering.number_of_trajectories()
             assert len(out[0]) == self.clustering.trajectory_lengths()[0]
+
+    def test_regspace_nthreads(self):
+        for metric in ('euclidean', 'minRMSD'):
+            self.clustering.estimate(self.src, n_jobs=1, dmin=self.dmin, metric=metric)
+            cl2 = cluster_regspace(self.src, n_jobs=2, dmin=self.dmin, metric=metric)
+            np.testing.assert_equal(self.clustering.clustercenters, cl2.clustercenters)
+
 
 if __name__ == "__main__":
     unittest.main()

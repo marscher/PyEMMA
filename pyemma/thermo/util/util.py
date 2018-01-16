@@ -214,8 +214,12 @@ def _get_umbrella_bias_sequences(trajs, umbrella_centers, force_constants, width
         if traj.shape[1] != dimension:
             raise ValueError("Trajectory %d has unmatching dimension: %d!=%d" % (
                 i, traj.shape[1], dimension))
-        bias_sequences.append(
-            _get_umbrella_bias(traj, umbrella_centers, force_constants, width))
+        bias_sequences.append(_get_umbrella_bias(
+                _np.require(traj, requirements='C'),
+                _np.require(umbrella_centers, requirements='C'),
+                _np.require(force_constants, requirements='C'),
+                _np.require(width, requirements='C')
+        ))
     return bias_sequences
 
 def get_umbrella_sampling_data(
@@ -322,7 +326,7 @@ def _get_multi_temperature_bias_sequences(
                     * energy_traj[:, _np.newaxis])
     else:
         # non-reduced case and temperatures given
-        kT = temperatures
+        kT = temperatures.copy()
         rT = reference_temperature
         if temp_unit.lower() == 'c':
             kT += conversion_shift_Celsius_to_Kelvin

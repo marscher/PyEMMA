@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import absolute_import, print_function
 
 
 import inspect
@@ -359,6 +358,8 @@ def estimate_param_scan(estimator, X, param_sets, evaluate=None, evaluate_args=N
         return res
 
 
+# we do not want to derive from Serializable here, because this would make all children serializable.
+# However we guide serializable children, what to store/restore.
 class Estimator(_BaseEstimator, Loggable):
     """ Base class for pyEMMA estimators
 
@@ -400,7 +401,7 @@ class Estimator(_BaseEstimator, Loggable):
         raise NotImplementedError(
             'You need to overload the _estimate() method in your Estimator implementation!')
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         """Estimates parameters - for compatibility with sklearn.
 
         Parameters
@@ -428,3 +429,24 @@ class Estimator(_BaseEstimator, Loggable):
     def _check_estimated(self):
         if not self._estimated:
             raise Exception("Estimator is not parametrized.")
+
+    # serialization handling
+    __serialize_fields = ('_estimated', 'model')
+
+    def __my_getstate__(self):
+        state = {}
+
+        inspect_classes = filter(lambda c: hasattr(c, '_get_param_names'), self.__class__.__mro__)
+        for c in inspect_classes:
+            state.update({k: getattr(self, k, None) for k in c._get_param_names()})
+
+        return state
+
+    def __my_setstate__(self, state):
+        if state:
+            valid_parameters = list()
+            for c in filter(lambda c: hasattr(c, '_get_param_names'), self.__class__.__mro__):
+                valid_parameters.extend(c._get_param_names())
+            for param in valid_parameters:
+                if param in state:
+                    setattr(self, param, state.get(param))

@@ -22,8 +22,6 @@ Application walkthroughs
 
    generated/pentapeptide_msm
    generated/MSM_BPTI
-   generated/trypsin_benzamidine_hmm
-
 
 By means of application examples, these notebooks give an overview of following methods:
 
@@ -47,6 +45,9 @@ In this section we will give you in-depth tutorials on specific methods or conce
    generated/feature_selection
    generated/model_selection_validation
    generated/tpt
+   generated/augmented_markov_model_walkthrough
+   generated/storage
+
 
 Multi-Ensemble Markov state models
 ----------------------------------
@@ -55,7 +56,7 @@ Multi-Ensemble Markov state models
    :maxdepth: 1
 
    generated/PyEMMA.thermo.estimate_multi_temperatur_-_asymmetric_double_well
-   generated/PyEMMA.thermo.estimate_umbrella_sampling_-_asymmetric_double_well.rst
+   generated/PyEMMA.thermo.estimate_umbrella_sampling_-_asymmetric_double_well
 
 Estimation with fixed equilibrium distribution
 ----------------------------------------------

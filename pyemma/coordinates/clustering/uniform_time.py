@@ -17,7 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from __future__ import absolute_import, division
 
 import math
 
@@ -33,6 +32,7 @@ __all__ = ['UniformTimeClustering']
 @fix_docs
 class UniformTimeClustering(AbstractClustering):
     r"""Uniform time clustering"""
+    __serialize_version = 0
 
     def __init__(self, n_clusters=2, metric='euclidean', stride=1, n_jobs=None, skip=0):
         """r
