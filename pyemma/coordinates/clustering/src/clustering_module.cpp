@@ -35,5 +35,6 @@ PYBIND11_MODULE(_ext, m) {
             .def("cluster", &kmeans_f::cluster)
             .def("cluster_loop", &kmeans_f::cluster_loop)
             .def("init_centers_KMpp", &kmeans_f::initCentersKMpp)
+            .def("init_centers_KMC", &kmeans_f::initCentersKMC)
             .def("cost_function", &kmeans_f::costFunction);
 }

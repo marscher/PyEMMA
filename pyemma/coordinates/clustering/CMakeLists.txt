@@ -20,9 +20,13 @@ if (MDTRAJ_INCLUDE STREQUAL "")
 endif()
 
 EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "import mdtraj; print(mdtraj.capi()['lib_dir'])"
-        OUTPUT_VARIABLE MDTRAJ_LIB)
+        OUTPUT_VARIABLE MDTRAJ_LIB OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+find_library(theo NAMES theobald PATHS "${MDTRAJ_LIB}" NO_DEFAULT_PATH)
+
+message(STATUS "mdtraj_lib: ${theo}")
 
 include_directories(include
                     ${MDTRAJ_INCLUDE})
 link_directories(${MDTRAJ_LIB})
-target_link_libraries(kmeans PUBLIC theobald)
+target_link_libraries(kmeans PUBLIC ${theo})
