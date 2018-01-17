@@ -70,7 +70,7 @@ public:
      * @return init centers.
      */
     np_array initCentersKMC(const np_array& /*np_data*/, unsigned int /*random_seed*/, unsigned int /*chain len */,
-                            bool afkmc2, np_array& np_weights) const;
+                            bool /*afkmc2*/, np_array& /*np_weights*/, py::object& /*callback*/) const;
 
 protected:
     unsigned int k;

@@ -48,7 +48,8 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
 
     def __init__(self, n_clusters, max_iter=5, metric='euclidean',
                  tolerance=1e-5, init_strategy='kmeans++', fixed_seed=False,
-                 oom_strategy='memmap', stride=1, n_jobs=None, skip=0, clustercenters=None, keep_data=False):
+                 oom_strategy='memmap', stride=1, n_jobs=None, skip=0, clustercenters=None, keep_data=False,
+                 weights=None):
         r"""Kmeans clustering
 
         Parameters
@@ -70,7 +71,7 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
             metric to use during clustering ('euclidean', 'minRMSD')
 
         init_strategy : string
-            can be either 'kmeans++' or 'uniform', determining how the initial
+            can be one of ('kmeans++', 'uniform', 'k-mc2', 'afk-mc2') determining how the initial
             cluster centers are being chosen
 
         fixed_seed : bool or int
@@ -100,6 +101,8 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
             If you intend to resume the kmeans iteration later on, in case it did not converge,
             this parameter controls whether the input data is kept in memory or not.
 
+        weights: None or array(k)
+            weights of data points (default: uniform weights)
         """
         super(KmeansClustering, self).__init__(metric=metric, n_jobs=n_jobs)
 
@@ -112,7 +115,7 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
         self.set_params(n_clusters=n_clusters, max_iter=max_iter, tolerance=tolerance,
                         init_strategy=init_strategy, oom_strategy=oom_strategy,
                         fixed_seed=fixed_seed, stride=stride, skip=skip, clustercenters=clustercenters,
-                        keep_data=keep_data
+                        keep_data=keep_data, weights=weights
                         )
 
     @property
@@ -122,7 +125,7 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
 
     @init_strategy.setter
     def init_strategy(self, value):
-        valid = ('kmeans++', 'uniform')
+        valid = ('kmeans++', 'uniform', 'k-mc2', 'afk-mc2')
         if value not in valid:
             raise ValueError('invalid parameter "{}" for init_strategy. Should be one of {}'.format(value, valid))
         self._init_strategy = value
@@ -278,9 +281,9 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
             n_chunks = self.data_producer.n_chunks(chunksize=self.chunksize, skip=self.skip, stride=self.stride)
             self._progress_register(n_chunks, description="creating data array", stage='data')
 
-        if self.init_strategy == 'kmeans++':
+        if self.init_strategy in ('kmeans++', 'k-mc2', 'afk-mc2'):
             self._progress_register(self.n_clusters,
-                                    description="initialize kmeans++ centers", stage=0)
+                                    description="initialize centers with {}".format(self.init_strategy), stage=0)
         self._progress_register(self.max_iter, description="kmeans iterations", stage=1)
         self._init_in_memory_chunks(total_length)
 
@@ -308,13 +311,15 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
                     if len(self.clustercenters) < self.n_clusters and t + l in self._init_centers_indices[itraj]:
                         new = np.vstack((self.clustercenters, X[l]))
                         self.clustercenters = new
-        elif last_chunk and self.init_strategy == 'kmeans++':
-            if self.init_strategy == 'kmeans++' and self.show_progress:
-                callback = lambda: self._progress_update(1, stage=0)
-            else:
-                callback = None
-            self.clustercenters = self._inst.init_centers_KMpp(self._in_memory_chunks, self.fixed_seed, self.n_jobs,
-                                                               callback)
+        elif last_chunk and self.init_strategy in ('kmeans++', 'afk-mc2'):
+            callback = lambda: self._progress_update(1, stage=0) if self.show_progress else None
+            if self.init_strategy == 'kmeans++':
+                self.clustercenters = self._inst.init_centers_KMpp(self._in_memory_chunks, self.fixed_seed, self.n_jobs,
+                                                                   callback)
+            elif self.init_strategy in ('k-mc2', 'afk-mc2'):
+                afkmc2 = self.init_strategy == 'afk-mc2'
+                self.clustercenters = self._inst.init_centers_KMC(self._in_memory_chunks, self.fixed_seed,
+                                                                  self.chain_length, afkmc2, self.weights, callback)
 
     def _collect_data(self, X, first_chunk, last_chunk):
         # beginning - compute

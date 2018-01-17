@@ -10,14 +10,15 @@
 #include <algorithm>
 
 template<typename dtype>
-typename KMeans<dtype>::np_array KMeans<dtype>::initCentersKMC(const np_array &np_data, unsigned int random_seed, unsigned int chain_len,
-                                                               bool afkmc2, np_array &np_weights) const {
+typename KMeans<dtype>::np_array
+KMeans<dtype>::initCentersKMC(const np_array &np_data, unsigned int random_seed, unsigned int chain_len,
+                              bool afkmc2, np_array &np_weights,  py::object& callback) const {
 
     auto dim = np_data.shape(1);
     std::vector<std::size_t> shape = {k, dim};
     np_array np_centers(shape);
 
-    if(np_weights.is_none()) {
+    if (np_weights.is_none()) {
         np_weights = py::array_t<int>(np_data.shape(0));
         auto buff = np_weights.mutable_unchecked();
         for (std::size_t i = 0; i < np_weights.shape(0); ++i) {
@@ -41,10 +42,10 @@ typename KMeans<dtype>::np_array KMeans<dtype>::initCentersKMC(const np_array &n
     // assign first center
     np_centers[0] = rel_row;
 
-    np_array di (dim);
+    np_array di(dim);
     auto data = np_data.unchecked();
     auto centers = np_centers.unchecked();
-    np_array q (dim);
+    np_array q(dim);
     if (afkmc2) {
         auto min = std::numeric_limits<dtype>::max();
         //std::vector<dtype> dists;
@@ -61,7 +62,7 @@ typename KMeans<dtype>::np_array KMeans<dtype>::initCentersKMC(const np_array &n
         std::copy(&centers(min_ind, 0), &centers(min_ind, dim), diData);
         // di * w
         std::transform(diData, diData + dim, weights.data(0), diData, [](const auto d, const auto w) {
-            return d*w;
+            return d * w;
         });
 
     } else {
@@ -80,31 +81,46 @@ typename KMeans<dtype>::np_array KMeans<dtype>::initCentersKMC(const np_array &n
     double cand_prob, curr_prob;
     std::size_t curr_ind = 0;
 
-    for (int i = 0; i < k-1; ++i) {
+    // acceptance distribution
+    std::uniform_real_distribution<dtype> acceptance_dist;
+    std::mt19937 acceptance_gen(random_seed);
+
+    for (int i = 0; i < k - 1; ++i) {
         // Draw the candidate indices
-        for(int j =0 ; j< chain_len; ++j) {
+        for (int j = 0; j < chain_len; ++j) {
             cand_ind[j] = static_cast<std::size_t >(dist(gen));
         }
         // Extract the proposal probabilities
         // TODO: fancy indexing possible?
         auto q_cand = q.at(cand_ind);
-        // compute pairwise dists
-        auto min = std::numeric_limits<dtype>::max();
-        for(const auto candidateIndex : cand_ind) {
+        // compute pairwise distances for each candidate
+        for (const auto candidateIndex : cand_ind) {
+            auto min = std::numeric_limits<dtype>::max();
             for (auto j = 0U; j < i + 1; ++j) {
                 auto value = parent_t::metric->compute(&data(candidateIndex, 0), &centers(j, 0));
-
+                if (value < min) {
+                    min = value;
+                }
             }
         }
         // compute potentials
+
+        // di * w
+        std::transform(diData, diData + dim, weights.data(0), diData, [](const auto d, const auto w) {
+            return d * w;
+        });
+
         auto p_cand;
 
         // compute acceptance probabilities
         auto rand_a;
+        for (int j = 0; j < chain_len; ++j) {
+            rand_a[j] = acceptance_dist(acceptance_gen);
+        }
 
         for (int j = 0; j < q_cand.shape(0); ++j) {
             auto cand_prob = p_cand[j] / q_cand[j];
-            if(j == 0 || curr_prob == 0.0 || cand_prob / curr_prob > rand_a[j]) {
+            if (j == 0 || curr_prob == 0.0 || cand_prob / curr_prob > rand_a[j]) {
                 // init new chain; Metropolis-Hastings-step
                 curr_ind = j;
                 curr_prob = cand_prob;
@@ -112,6 +128,9 @@ typename KMeans<dtype>::np_array KMeans<dtype>::initCentersKMC(const np_array &n
         }
         //rel_row = np_data[cand_ind[curr_ind], :];
         //np_centers[i+1, :] = rel_row;
+        if (! callback.is_none()) {
+            callback();
+        }
     }
 
     return np_centers;
