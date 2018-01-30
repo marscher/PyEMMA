@@ -13,24 +13,31 @@ class TestSourcesMerger(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         config.coordinates_check_output = True
+        import tempfile
+        cls.testdir = tempfile.mkdtemp()
+        cls.ntrajs = 4
+        cls.dims = [np.random.randint(10, 100) for _ in range(cls.ntrajs//2)]*2
+        cls.traj_lengths = 100
+        cls.npy_files = []
+        cls.data = []
+        for i, dim in enumerate(cls.dims):
+            data = np.random.random((cls.traj_lengths, dim))
+            fn = os.path.join(cls.testdir, '%s.npy' % i)
+            np.save(fn, data)
+            cls.npy_files.append(fn)
+            cls.data.append(data)
 
     @classmethod
     def tearDownClass(cls):
         config.coordinates_check_output = False
+        import shutil
+        shutil.rmtree(cls.testdir)
 
     def setUp(self):
         self.readers = []
-        data_dir = pkg_resources.resource_filename('pyemma.coordinates.tests', 'data')
-        trajs = glob(data_dir + "/bpti_0*.xtc")
-        top = os.path.join(data_dir, 'bpti_ca.pdb')
-        self.readers.append(source(trajs, top=top))
-        ndim = self.readers[0].ndim
-        lengths = self.readers[0].trajectory_lengths()
-        arrays = [np.random.random( (length, ndim) ) for length in lengths]
-
+        self.readers.append(source(self.npy_files[:2]))
+        self.readers.append(source(self.npy_files[2:]))
         self.desired_combined_output = None
-
-        self.readers.append(source(arrays))
 
     def _get_output_compare(self, joiner, stride=1, chunk=0, skip=0):
         j = joiner

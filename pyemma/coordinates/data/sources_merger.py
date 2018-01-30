@@ -89,3 +89,7 @@ class _JoiningIterator(DataSourceIterator):
             self._t = 0
             self._itraj = itraj
             self._selected_itraj = itraj
+
+            for it in self._iterators:
+                it._select_file(itraj)
+
