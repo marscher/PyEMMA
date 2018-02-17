@@ -159,8 +159,12 @@ class iterload(object):
                        md_open(x, n_atoms=self._topology.n_atoms)
                        if self._extension in ('.crd', '.mdcrd')
                        else md_open(self._filename))(self._filename)
+            # set byte offsets here to avoid len(operation) reading the whole xtc file again.
+            if hasattr(self._f, 'offsets') and self._offsets is not None:
+                self._f.offsets = self._offsets
+
             if not isinstance(self._stride, np.ndarray):
-                self._stride  = np.arange(self._skip, len(self._f), self._stride)
+                self._stride  = np.arange(self._skip, self._trajlen, self._stride)
             self._ra_it = self._random_access_generator(self._f)
         else:
             self._mode = 'traj'
@@ -171,9 +175,8 @@ class iterload(object):
             )(self._filename)
 
             # offset array handling
-            offsets = self._offsets
-            if hasattr(self._f, 'offsets') and offsets is not None:
-                self._f.offsets = offsets
+            if hasattr(self._f, 'offsets') and self._offsets is not None:
+                self._f.offsets = self._offsets
 
     @property
     def chunksize(self):
@@ -226,14 +229,14 @@ class iterload(object):
             if self._chunksize == 0:
                 n_frames = None  # read all frames
             else:
+                # TODO: this should not multiply with stride actually...
                 n_frames = self._chunksize * self._stride
 
+            args = dict(n_frames=n_frames, stride=self._stride, atom_indices=self._atom_indices, **self._kwargs)
             if self._extension not in _TOPOLOGY_EXTS:
-                traj = self._f.read_as_traj(self._topology, n_frames=n_frames,
-                                            stride=self._stride, atom_indices=self._atom_indices, **self._kwargs)
+                traj = self._f.read_as_traj(self._topology, **args)
             else:
-                traj = self._f.read_as_traj(n_frames=n_frames,
-                                            stride=self._stride, atom_indices=self._atom_indices, **self._kwargs)
+                traj = self._f.read_as_traj(**args)
 
         if len(traj) == 0:
             raise StopIteration("eof")
