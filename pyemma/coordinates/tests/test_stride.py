@@ -15,12 +15,9 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-
-
 from __future__ import print_function
-
 from __future__ import absolute_import
+
 import unittest
 import os
 import tempfile
@@ -29,15 +26,14 @@ import mdtraj
 import pyemma.coordinates as coor
 
 
-
 class TestStride(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.dim = 3  # dimension (must be divisible by 3)
         N_trajs = 10  # number of trajectories
-
+        cls.tmpdir = tempfile.mkdtemp()
         # create topology file
-        cls.temppdb = tempfile.mktemp('.pdb')
+        cls.temppdb = tempfile.mktemp('.pdb', dir=cls.tmpdir)
         with open(cls.temppdb, 'w') as f:
             for i in range(cls.dim//3):
                 print(('ATOM  %5d C    ACE A   1      28.490  31.600  33.379  0.00  1.00' % i), file=f)
@@ -54,9 +50,13 @@ class TestStride(unittest.TestCase):
             traj = mdtraj.load(cls.temppdb)
             traj.xyz = xyz
             traj.time = t
-            tempfname = tempfile.mktemp('.xtc')
+            tempfname = tempfile.mktemp('.xtc', dir=cls.tmpdir)
             traj.save(tempfname)
             cls.trajnames.append(tempfname)
+
+    def tearDownClass(cls):
+        import shutil
+        shutil.rmtree(cls.tmpdir, ignore_errors=True)
 
     def test_length_and_content_feature_reader_and_TICA(self):
         for stride in range(1, 100, 23):
