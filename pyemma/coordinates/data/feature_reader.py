@@ -416,5 +416,6 @@ class FeatureReaderIterator(DataSourceIterator):
         else:
             flen = self.ra_trajectory_length(self._itraj)
         return patches.iterload(filename, flen, chunk=self.chunksize, top=self._data_source.featurizer.topology,
-                                skip=skip, stride=stride, atom_indices=atom_indices)
+                                skip=skip, stride=stride, atom_indices=atom_indices,
+                                offsets=self._data_source._offsets[self._itraj])
 
