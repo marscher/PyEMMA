@@ -36,6 +36,7 @@ from pyemma.coordinates.data._base.transformer import StreamingEstimationTransfo
 from pyemma.util.annotators import fix_docs, aliased, alias
 from pyemma.util.discrete_trajectories import index_states, sample_indexes_by_state
 from pyemma.util.files import mkdir_p
+from pyemma.util.numeric import _hash_numpy_array
 
 
 @fix_docs
@@ -61,11 +62,14 @@ class AbstractClustering(StreamingEstimationTransformer, Model, ClusterMixin, NJ
         self.clustercenters = None
         self._previous_stride = -1
         self._dtrajs = []
+        self._dtrajs_assigned_from_centers = None  # remember from which centers array this has been assigned.
         self._overwrite_dtrajs = False
         self._index_states = []
         self.n_jobs = n_jobs
 
-    __serialize_fields = ('_dtrajs', '_previous_stride', '_index_states', '_overwrite_dtrajs', '_precentered')
+    __serialize_fields = ('_dtrajs', '_dtrajs_assigned_from_centers',
+                          '_previous_stride', '_index_states', '_overwrite_dtrajs',
+                          '_precentered')
     __serialize_version = 0
 
     def set_model_params(self, clustercenters):
@@ -94,11 +98,12 @@ class AbstractClustering(StreamingEstimationTransformer, Model, ClusterMixin, NJ
         self._overwrite_dtrajs = value
 
     @property
-    #@alias('labels_') # TODO: for fully sklearn-compat this would have to be a flat array!
     def dtrajs(self):
         """Discrete trajectories (assigned data to cluster centers)."""
-        if len(self._dtrajs) == 0:  # nothing assigned yet, doing that now
+        current_centers_print = _hash_numpy_array(self.clustercenters)
+        if len(self._dtrajs) == 0 or current_centers_print != self._dtrajs_assigned_from_centers:
             self._dtrajs = self.assign(stride=1)
+            self._dtrajs_assigned_from_centers = current_centers_print
 
         return self._dtrajs  # returning what we have saved
 
@@ -221,7 +226,7 @@ class AbstractClustering(StreamingEstimationTransformer, Model, ClusterMixin, NJ
             return self._dtrajs
         else:
             if stride != 1:
-                raise ValueError('assign accepts either X or stride parameters, but not both. If you want to map '+
+                raise ValueError('assign accepts either X or stride parameters, but not both. If you want to map '
                                  'only a subset of your data, extract the subset yourself and pass it as X.')
             # map to column vector(s)
             mapped = self.transform(X)

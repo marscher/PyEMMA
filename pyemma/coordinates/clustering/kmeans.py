@@ -220,11 +220,11 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
 
             self.logger.debug("Accumulated all data, running kmeans on %s", self._in_memory_chunks.shape)
             self._in_memory_chunks_set = True
-        else:
-            if len(self.clustercenters) != self.n_clusters:
-                # TODO: this can be non-fatal, because the extension can handle it?!
-                raise RuntimeError('Passed clustercenters do not match n_clusters: {} vs. {}'.
-                                   format(len(self.clustercenters), self.n_clusters))
+        #else:
+        #    if len(self.clustercenters) != self.n_clusters:
+        #        # TODO: this can be non-fatal, because the extension can handle it?!
+        #        raise RuntimeError('Passed clustercenters do not match n_clusters: {} vs. {}'.
+        #                           format(len(self.clustercenters), self.n_clusters))
 
         if self.show_progress:
             callback = lambda: self._progress_update(1, stage=1)
@@ -238,7 +238,7 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
                                                                             callback)
             if code == 0:
                 self._converged = True
-                self.logger.info("Cluster centers converged after %i steps.", iterations + 1)
+                self.logger.debug("Cluster centers converged after %i steps.", iterations + 1)
             else:
                 self.logger.info("Algorithm did not reach convergence criterion"
                                  " of %g in %i iterations. Consider increasing max_iter.",
@@ -274,13 +274,13 @@ class KmeansClustering(AbstractClustering, ProgressReporterMixin):
         if not self.n_clusters:
             self.n_clusters = min(int(math.sqrt(total_length)), 5000)
             self.logger.info("The number of cluster centers was not specified, "
-                              "using min(sqrt(N), 5000)=%s as n_clusters." % self.n_clusters)
+                             "using min(sqrt(N), 5000)=%s as n_clusters." % self.n_clusters)
         from pyemma.coordinates.data import DataInMemory
         if not isinstance(self, MiniBatchKmeansClustering) and not isinstance(self.data_producer, DataInMemory):
             n_chunks = self.data_producer.n_chunks(chunksize=self.chunksize, skip=self.skip, stride=self.stride)
             self._progress_register(n_chunks, description="creating data array", stage='data')
 
-        if self.init_strategy == 'kmeans++':
+        if self.init_strategy == 'kmeans++' and not self._check_resume_iteration():
             self._progress_register(self.n_clusters,
                                     description="initialize kmeans++ centers", stage=0)
         self._progress_register(self.max_iter, description="kmeans iterations", stage=1)
