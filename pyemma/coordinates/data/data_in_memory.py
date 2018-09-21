@@ -70,14 +70,22 @@ class DataInMemory(DataSource, SerializableMixIn):
 
         # everything is an array
         if all(isinstance(d, np.ndarray) for d in data):
-            for d in data:
-                self._add_array_to_storage(d)
+            # TODO: type checking? casting warnings?
+            from collections import OrderedDict
+            dims = OrderedDict()
+            for i, d in enumerate(data):
+                self._add_array_to_storage(d, index=i, dims=dims)
         else:
-            raise ValueError("Please supply numpy.ndarray, or list/tuple of ndarray."
-                             " Your input was %s" % str(data))
+            raise ValueError('Please supply numpy.ndarray, or list/tuple of ndarray.'
+                             ' Your input was {}'.format(data))
 
-        self._set_dimensions_and_lenghts()
-        self._filenames = [DataInMemory.IN_MEMORY_FILENAME] * self._ntraj
+        # set unique dimension
+        dims = tuple(dims)
+        assert len(dims) == 1
+        self._ndim = dims[0]
+        if self.ntraj == 0:
+            raise ValueError("no valid data")
+        self._filenames = [DataInMemory.IN_MEMORY_FILENAME] * self.ntraj
 
     @property
     def data(self):
@@ -89,7 +97,7 @@ class DataInMemory(DataSource, SerializableMixIn):
         """
         return self._data
 
-    def _add_array_to_storage(self, array):
+    def _add_array_to_storage(self, array, index, dims):
         """
         checks shapes, eg convert them (2d), raise if not possible
         after checks passed, add array to self._data
@@ -103,28 +111,19 @@ class DataInMemory(DataSource, SerializableMixIn):
             # hold first dimension, multiply the rest
             shape_2d = (shape[0], functools.reduce(lambda x, y: x * y, shape[1:]))
             array = np.reshape(array, shape_2d)
-
+        d = array.shape[1]
+        dims[d] = None
+        if len(dims) > 1:
+            dims = tuple(dims.keys())
+            raise ValueError('Input data has different dimensions! Faulty array at index={index} has dimension {dim}'
+                             '. Previous array dimension is: {prev_dim}.'
+                             .format(index=index, prev_dim=dims[0], dim=dims[1]))
         self.data.append(array)
+        self._ntraj += 1
+        self._lengths.append(len(array))
 
     def output_type(self):
         return self.data[0].dtype
-
-    def _set_dimensions_and_lenghts(self):
-        # number of trajectories/data sets
-        self._ntraj = len(self.data)
-        if self.ntraj == 0:
-            raise ValueError("no valid data")
-
-        # this works since everything is flattened to 2d
-        self._lengths = [np.shape(d)[0] for d in self.data]
-
-        # ensure all trajs have same dim
-        ndims = [np.shape(x)[1] for x in self.data]
-        if not np.unique(ndims).size == 1:
-            raise ValueError("input data has different dimensions!"
-                             "Dimensions are = %s" % ndims)
-
-        self._ndim = ndims[0]
 
     @classmethod
     def load_from_files(cls, files):

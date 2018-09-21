@@ -45,6 +45,7 @@ class DataSource(Iterable, TrajectoryRandomAccessible):
         self._offsets = []
         self._filenames = None
         self._is_reader = False
+        self._ntraj = 0
 
     @property
     def ntraj(self):

@@ -119,8 +119,9 @@ class TestDataInMemory(unittest.TestCase):
         """ should raise, since different dims can not be processed"""
         data = [np.zeros((10, 3)), np.zeros((10, 5))]
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as cm:
             DataInMemory(data)
+        self.assertIn('different dimensions', cm.exception.args[0])
 
     def test_ndim_input(self):
         data = np.empty((4, 2, 2, 2))
