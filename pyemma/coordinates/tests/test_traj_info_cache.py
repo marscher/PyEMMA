@@ -230,7 +230,7 @@ class TestTrajectoryInfoCache(unittest.TestCase):
             info = db[fn, reader]
             assert info.length == 3
             assert info.ndim == 1
-            assert info.offsets == []
+            assert info.offsets == ()
 
     def test_corrupted_db(self):
         with NamedTemporaryFile(mode='w', suffix='.dat', delete=False) as f:

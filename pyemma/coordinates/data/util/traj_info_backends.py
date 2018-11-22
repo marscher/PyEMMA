@@ -132,7 +132,10 @@ class SqliteDB(AbstractDB):
                 version = self.db_version
             else:
                 version = row[0]
-            if version != TrajectoryInfoCache.DB_VERSION:
+            if version == 2 and TrajectoryInfoCache.DB_VERSION == 3:
+                self._clean(0)
+                self._upgrade_v2_to_v3()
+            elif version != TrajectoryInfoCache.DB_VERSION:
                 # drop old db? or try to convert?
                 self._create_new_db()
         except sqlite3.OperationalError as e:
@@ -277,7 +280,6 @@ class SqliteDB(AbstractDB):
                         conn.execute("insert into usage(hash, last_read) values(?, ?)", (hash_value, time.time()))
                     else:
                         conn.execute("update usage set last_read=? where hash=?", (time.time(), hash_value))
-                    conn.commit()
             except sqlite3.OperationalError:
                 # if there are many jobs to write to same database at same time, the timeout could be hit
                 logger.debug('could not update LRU info for db %s', db_name)
@@ -301,7 +303,7 @@ class SqliteDB(AbstractDB):
 
             info = TrajInfo()
             info._version = version
-            if version == 2:
+            if version in (2, 3):
                 info._hash = hash
                 info._ndim = ndim
                 info._length = length
@@ -356,10 +358,16 @@ class SqliteDB(AbstractDB):
         ids = map(itemgetter(0), age_by_hash[:num_delete])
         ids = tuple(map(str, ids))
 
-        sql_compatible_ids = SqliteDB._format_tuple_for_sql(ids)
-
+        # extend by missing files
         with self._database as c:
-            c.execute("DELETE FROM traj_info WHERE hash in (%s)" % sql_compatible_ids)
+            cursor = c.execute('SELECT hash, abs_path from traj_info')
+            missing = []
+            for hash, abspath in cursor:
+                if not os.path.exists(abspath):
+                    missing.append(abspath)
+            to_remove = missing + ids
+
+            c.execute("DELETE FROM traj_info WHERE hash in (%s)" % SqliteDB._format_tuple_for_sql(to_remove))
 
             # iterate over all LRU databases and delete those ids, we've just deleted from the main db.
             # Do this within the same execution block of the main database, because we do not want the entry to be deleted,
@@ -372,3 +380,21 @@ class SqliteDB(AbstractDB):
                                 % SqliteDB._format_tuple_for_sql(values)
                         curr = conn.execute(stmnt)
                         assert curr.rowcount == len(values), curr.rowcount
+
+    def _upgrade_v2_to_v3(self):
+        missing = []
+        updates = []
+        try:
+            with self._database as c:
+                cursor = c.execute('SELECT hash, abs_path from traj_info')
+                for hash, abspath in cursor:
+                    if not os.path.exists(abspath):
+                        missing.append(abspath)
+                    else:
+                        new_hash = TrajectoryInfoCache._get_file_hash_v3(abspath)
+                        updates.append((new_hash, 3, abspath))
+
+                c.execute('DELETE FROM traj_info where abs_path in (%s)' % SqliteDB._format_tuple_for_sql(missing))
+                c.executemany('UPDATE traj_info set hash=?, version=? WHERE abs_path=?', updates)
+        except BaseException as e:
+            logger.exception('error during upgrade procedure.')

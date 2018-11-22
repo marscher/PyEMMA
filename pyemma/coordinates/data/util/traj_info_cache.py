@@ -49,7 +49,7 @@ class TrajInfo(object):
         self._ndim = ndim
         self._length = length
         if offsets is None:
-            self._offsets = []
+            self._offsets = ()
         else:
             self._offsets = offsets
 
@@ -131,7 +131,7 @@ class TrajectoryInfoCache(object):
 
     """
     _instance = None
-    DB_VERSION = 2
+    DB_VERSION = 3
 
     @staticmethod
     def instance():
@@ -182,7 +182,7 @@ class TrajectoryInfoCache(object):
     def __getitem__(self, filename_reader_tuple):
         filename, reader = filename_reader_tuple
         abs_path = os.path.abspath(filename)
-        key = self._get_file_hash_v2(filename)
+        key = self._get_file_hash_v3(filename)
         try:
             info = self._database.get(key)
             if not isinstance(info, TrajInfo):
@@ -211,7 +211,8 @@ class TrajectoryInfoCache(object):
 
         return info
 
-    def _get_file_hash(self, filename):
+    @staticmethod
+    def _get_file_hash(filename):
         statinfo = os.stat(filename)
 
         # only remember file name without path, to re-identify it when its
@@ -227,7 +228,8 @@ class TrajectoryInfoCache(object):
         hash_value ^= hash(data)
         return str(hash_value)
 
-    def _get_file_hash_v2(self, filename):
+    @staticmethod
+    def _get_file_hash_v2(filename):
         statinfo = os.stat(filename)
         # now read the first megabyte and hash it
         with open(filename, mode='rb') as fh:
@@ -241,6 +243,15 @@ class TrajectoryInfoCache(object):
         hasher.update(str(statinfo.st_mtime).encode('ascii'))
         hasher.update(str(statinfo.st_size).encode('ascii'))
         hasher.update(data)
+        return hasher.hexdigest()
+
+    @staticmethod
+    def _get_file_hash_v3(filename):
+        statinfo = os.stat(filename)
+        hasher = hashlib.md5()
+        hasher.update(os.path.abspath(filename).encode('utf-8'))
+        hasher.update(str(statinfo.st_mtime).encode('ascii'))
+        hasher.update(str(statinfo.st_size).encode('ascii'))
         return hasher.hexdigest()
 
     def __setitem__(self, traj_info):
