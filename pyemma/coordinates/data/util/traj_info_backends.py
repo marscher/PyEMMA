@@ -125,23 +125,26 @@ class SqliteDB(AbstractDB):
         self.lru_timeout = 5.0 # python sqlite3 specifies timeout in seconds instead of milliseconds.
 
         try:
-            cursor = self._database.execute("select num from version")
-            row = cursor.fetchone()
-            if not row:
-                self.db_version = TrajectoryInfoCache.DB_VERSION
+            try:
                 version = self.db_version
-            else:
-                version = row[0]
+            except RuntimeError:
+                # no version known:
+                raise sqlite3.OperationalError('no such table')
+
             if version == 2 and TrajectoryInfoCache.DB_VERSION == 3:
-                self._clean(0)
                 self._upgrade_v2_to_v3()
-            elif version != TrajectoryInfoCache.DB_VERSION:
-                # drop old db? or try to convert?
+            elif version < TrajectoryInfoCache.DB_VERSION:
+                logger.info('db version unknown, re-creating db.')
                 self._create_new_db()
+            elif version > TrajectoryInfoCache.DB_VERSION:
+                logger.info('db version is newer than known. Refusing operation')
+                raise RuntimeError()
         except sqlite3.OperationalError as e:
-            if "no such table" in str(e):
+            if 'no such table' in str(e):
                 self._create_new_db()
-                self.db_version = TrajectoryInfoCache.DB_VERSION
+            else:
+                logger.exception('Database corrupt or can not be created')
+                raise e
         except sqlite3.DatabaseError:
             bak = filename + ".bak"
             warnings.warn("TrajInfo database corrupted. Backing up file to %s and start with new one." % bak)
@@ -165,7 +168,8 @@ class SqliteDB(AbstractDB):
         """
         self._database.execute(create_version_table)
         self._database.execute(create_info_table)
-        self._database.commit()
+        self._database.execute("insert into version VALUES (?)", [TrajectoryInfoCache.DB_VERSION])
+        logger.debug('created new db')
 
     def close(self):
         self._database.close()
@@ -180,19 +184,14 @@ class SqliteDB(AbstractDB):
 
     @db_version.setter
     def db_version(self, val):
-        import sqlite3
-        with self._database:
-            try:
-                self._database.execute("insert into version VALUES (?)", [val])
-            except sqlite3.IntegrityError:
-                pass
-       # self._database.commit()
+        with self._database as c:
+            c.execute('UPDATE version set num={}'.format(val))
+
+        assert self.db_version == int(val)
 
     @property
     def num_entries(self):
-        # cursor = self._database.execute("SELECT hash FROM traj_info;")
-        # return len(cursor.fetchall())
-        c = self._database.execute("SELECT COUNT(hash) from traj_info;").fetchone()
+        c = self._database.execute("SELECT COUNT(hash) from traj_info").fetchone()
         return int(c[0])
 
     def set(self, traj_info):
@@ -266,6 +265,8 @@ class SqliteDB(AbstractDB):
         if not db_name:
             db_name=':memory:'
 
+        #self._lru_updates = fifo()
+
         def _update():
             import sqlite3
             try:
@@ -316,85 +317,107 @@ class SqliteDB(AbstractDB):
             logger.exception(ex)
             raise UnknownDBFormatException(ex)
 
-    @staticmethod
-    def _format_tuple_for_sql(value):
-        value = tuple(str(v) for v in value)
-        return repr(value)[1:-2 if len(value) == 1 else -1]
-
     def _clean(self, n):
         """
         obtain n% oldest entries by looking into the usage databases. Then these entries
         are deleted first from the traj_info db and afterwards from the associated LRU dbs.
+
+        Also removes missing files (from traj_info and lru dbs)
 
         :param n: delete n% entries in traj_info db [and associated LRU (usage) dbs].
         """
         # delete the n % oldest entries in the database
         import sqlite3
         num_delete = int(self.num_entries / 100.0 * n)
-        logger.debug("removing %i entries from db" % num_delete)
-        lru_dbs = self._database.execute("select hash, lru_db from traj_info").fetchall()
-        lru_dbs.sort(key=itemgetter(1))
-        hashs_by_db = {}
-        age_by_hash = []
-        for k, v in itertools.groupby(lru_dbs, key=itemgetter(1)):
-            hashs_by_db[k] = list(x[0] for x in v)
+        if num_delete > 0:
+            logger.debug("removing %i entries from db" % num_delete)
+            # TODO: check for existance first!
+            # TODO: check for dupes (by abspath)
+            hashs_by_db = {k[0] for k in self._database.execute("select lru_db from traj_info")}
+            age_by_hash = []
 
-        # debug: distribution
-        len_by_db = {os.path.basename(db): len(hashs_by_db[db]) for db in hashs_by_db.keys()}
-        logger.debug("distribution of lru: %s", str(len_by_db))
-        ### end dbg
+            # collect timestamps from databases
+            for db in hashs_by_db:
+                with sqlite3.connect(db, timeout=self.lru_timeout) as conn:
+                    cursor = conn.execute("select hash, last_read from usage")
+                    for h, last_read in cursor:
+                        age_by_hash.append((h, float(last_read), db))
 
-        # collect timestamps from databases
-        for db in hashs_by_db.keys():
-            with sqlite3.connect(db, timeout=self.lru_timeout) as conn:
-                rows = conn.execute("select hash, last_read from usage").fetchall()
-                for r in rows:
-                    age_by_hash.append((r[0], float(r[1]), db))
-
-        # sort by age
-        age_by_hash.sort(key=itemgetter(1))
-        if len(age_by_hash)>=2:
-            assert[age_by_hash[-1] > age_by_hash[-2]]
-        ids = map(itemgetter(0), age_by_hash[:num_delete])
-        ids = tuple(map(str, ids))
+            # sort by age
+            age_by_hash.sort(key=itemgetter(1))
+            if len(age_by_hash) >= 2:
+                assert[age_by_hash[-1] > age_by_hash[-2]]
+            ids = map(itemgetter(0), age_by_hash[:num_delete])
+            ids = tuple(map(str, ids))
+        else:
+            ids = ()
+            age_by_hash = []
 
         # extend by missing files
-        with self._database as c:
-            cursor = c.execute('SELECT hash, abs_path from traj_info')
-            missing = []
-            for hash, abspath in cursor:
-                if not os.path.exists(abspath):
-                    missing.append(abspath)
-            to_remove = missing + ids
+        cursor = self._database.execute('SELECT hash, abs_path, lru_db from traj_info')
+        to_remove = []
+        data = cursor.fetchall()
 
-            c.execute("DELETE FROM traj_info WHERE hash in (%s)" % SqliteDB._format_tuple_for_sql(to_remove))
+        def find_dupes(L):
+            seen = set()
+            dupes = []
+            seen_add = seen.add
+            dupes_append = dupes.append
+            for i, item in enumerate(L):
+                if item in seen:
+                    dupes_append(i)
+                else:
+                    seen_add(item)
+            return dupes
 
-            # iterate over all LRU databases and delete those ids, we've just deleted from the main db.
-            # Do this within the same execution block of the main database, because we do not want the entry to be deleted,
-            # in case of a subsequent failure.
-            age_by_hash.sort(key=itemgetter(2))
-            for db, values in itertools.groupby(age_by_hash, key=itemgetter(2)):
-                values = tuple(v[0] for v in values)
-                with sqlite3.connect(db, timeout=self.lru_timeout) as conn:
-                        stmnt = "DELETE FROM usage WHERE hash IN (%s)" \
-                                % SqliteDB._format_tuple_for_sql(values)
-                        curr = conn.execute(stmnt)
-                        assert curr.rowcount == len(values), curr.rowcount
+        dupes = [data[i][0] for i in find_dupes((x[1] for x in data))]
+
+        for hash, abspath, lru_db in data:
+            if not os.path.exists(abspath):
+                to_remove.append(hash)
+                age_by_hash.append((hash, None, lru_db))
+        del data
+
+        to_remove.extend(ids)
+        to_remove.extend(dupes)
+        if dupes:
+            logger.info('found %s duplicate entries', len(dupes))
+
+        if to_remove:
+            with self._database as c:
+                stmnt = "DELETE FROM traj_info WHERE hash in ({})".format(','.join(['?'] * len(to_remove)))
+                cursor = c.execute(stmnt, to_remove)
+                assert cursor.rowcount==len(to_remove), (cursor.rowcount ,len(to_remove))
+                logger.info('removed %s entries', len(to_remove))
+
+                # iterate over all LRU databases and delete those ids, we've just deleted from the main db.
+                # Do this within the same execution block of the main database, because we do not want the entry to be deleted,
+                # in case of a subsequent failure.
+                age_by_hash.sort(key=itemgetter(2))
+                for db, values in itertools.groupby(age_by_hash, key=itemgetter(2)):
+                    values = tuple(v[0] for v in values)
+                    if values:
+                        with sqlite3.connect(db, timeout=self.lru_timeout) as conn:
+                            stmnt = "DELETE FROM usage WHERE hash IN ({})".format(','.join(['?']*len(values)))
+                            cursor = conn.execute(stmnt, values)
+                            assert cursor.rowcount == len(values)
 
     def _upgrade_v2_to_v3(self):
-        missing = []
+        self._clean(0)
         updates = []
-        try:
-            with self._database as c:
-                cursor = c.execute('SELECT hash, abs_path from traj_info')
-                for hash, abspath in cursor:
-                    if not os.path.exists(abspath):
-                        missing.append(abspath)
-                    else:
-                        new_hash = TrajectoryInfoCache._get_file_hash_v3(abspath)
-                        updates.append((new_hash, 3, abspath))
+        with self._database as c:
+            cursor = c.execute('SELECT hash, abs_path from traj_info')
+            data = cursor.fetchall()
+            paths = {x[1] for x in data}
+            hashs = {x[0] for x in data}
+            assert len(paths) == len(hashs)
+            for hash, abspath in cursor:
+                assert os.path.exists(abspath)
+                new_hash = TrajectoryInfoCache._get_file_hash_v3(abspath)
+                updates.append((new_hash, 3, abspath))
+            c.executemany('UPDATE traj_info set hash=?, version=? WHERE abs_path=?', updates)
+        self.db_version = 3
 
-                c.execute('DELETE FROM traj_info where abs_path in (%s)' % SqliteDB._format_tuple_for_sql(missing))
-                c.executemany('UPDATE traj_info set hash=?, version=? WHERE abs_path=?', updates)
-        except BaseException as e:
-            logger.exception('error during upgrade procedure.')
+    def __str__(self):
+        return 'TrajDB SQLiteDB-{id} file: {f}'.format(id=id(self), f=self.filename)
+    __repr__ = __str__

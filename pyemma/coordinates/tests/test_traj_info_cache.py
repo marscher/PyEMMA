@@ -346,7 +346,7 @@ class TestTrajectoryInfoCache(unittest.TestCase):
         import subprocess
         import sys
         import time
-        script = 'import pyemma; pyemma.coordinates.source({files})' \
+        script = 'import pyemma; print(pyemma.config.cfg_dir); pyemma.coordinates.source({files})' \
             .format(cfg_dir=self.work_dir, files=npy_files)
         failed = False
         procs = [subprocess.Popen([sys.executable, '-c', script], env=env) for _ in range(10)]
@@ -373,6 +373,28 @@ class TestTrajectoryInfoCache(unittest.TestCase):
                 break
 
         self.assertTrue(not failed, msg=error)
+
+    def test_upgrade_v2_to_v3(self):
+        class_fqn = 'pyemma.coordinates.data.util.traj_info_cache.TrajectoryInfoCache'
+        self.tearDown() # delete version 3 db, prior creating a new instance.
+        org_method = FeatureReader._get_traj_info
+        count = [0]
+        def patched(self, file):
+            count[0] += 1
+            return org_method(self, file)
+        # emulate db version 2.
+        with mock.patch(class_fqn+'.DB_VERSION', 2), \
+            mock.patch(class_fqn+'._get_file_hash_v3', TrajectoryInfoCache._get_file_hash_v2), \
+            mock.patch('pyemma.coordinates.data.feature_reader.FeatureReader._get_traj_info', patched):
+                self.setUp()
+                reader = pyemma.coordinates.source(xtcfiles, top=pdbfile) # this call should query the files once via patched
+                assert count[0] == len(xtcfiles)
+        # now we try to upgrade the database
+        TrajectoryInfoCache.DB_VERSION = 3
+        TrajectoryInfoCache(self.db.database_filename)
+        reader = pyemma.coordinates.source(xtcfiles, top=pdbfile)  # this call should query the files once via patched
+        assert count[0] == len(xtcfiles)  # ensure we use the cache rather than obtaining the info again.
+
 
 if __name__ == "__main__":
     unittest.main()
