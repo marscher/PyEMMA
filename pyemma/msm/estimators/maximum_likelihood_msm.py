@@ -1,3 +1,4 @@
+
 # This file is part of PyEMMA.
 #
 # Copyright (c) 2015, 2014 Computational Molecular Biology Group, Freie Universitaet Berlin (GER)
@@ -16,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as _np
+import warnings as _warnings
 from msmtools import estimation as msmest
 
 from pyemma.msm.estimators._msm_estimator_base import _MSMEstimator
@@ -39,7 +41,7 @@ class MaximumLikelihoodMSM(_MSMEstimator):
                  count_mode='sliding', sparse=False,
                  connectivity='largest', dt_traj='1 step', maxiter=1000000,
                  maxerr=1e-8, score_method='VAMP2', score_k=10,
-                 mincount_connectivity='1/n'):
+                 mincount_connectivity='1/n', core_set=None):
         r"""Maximum likelihood estimator for MSMs given discrete trajectory statistics
 
         Parameters
@@ -147,6 +149,10 @@ class MaximumLikelihoodMSM(_MSMEstimator):
             may thus separate the resulting transition matrix. The default
             evaluates to 1/nstates.
 
+        core_set : None (default) or array like, dtype=int
+            If set to None, replaces state -1 (if applicable) and performs milestone counting.
+            No effect for Voronoi-discretized trajectories (default).
+
         References
         ----------
         .. [1] H. Wu and F. Noe: Variational approach for learning Markov processes from time series data
@@ -156,7 +162,7 @@ class MaximumLikelihoodMSM(_MSMEstimator):
         super(MaximumLikelihoodMSM, self).__init__(lag=lag, reversible=reversible, count_mode=count_mode,
                                                    sparse=sparse, connectivity=connectivity, dt_traj=dt_traj,
                                                    score_method=score_method, score_k=score_k,
-                                                   mincount_connectivity=mincount_connectivity)
+                                                   mincount_connectivity=mincount_connectivity, core_set=core_set)
 
         self.statdist_constraint = _types.ensure_ndarray_or_None(statdist_constraint, ndim=None, kind='numeric')
         if self.statdist_constraint is not None:  # renormalize
@@ -275,7 +281,6 @@ class MaximumLikelihoodMSM(_MSMEstimator):
 
         # Done. We set our own model parameters, so this estimator is
         # equal to the estimated model.
-        self._dtrajs_full = dtrajs
         self._connected_sets = dtrajstats.connected_sets
         self.set_model_params(P=P, pi=statdist_active, reversible=self.reversible,
                               dt_model=self.timestep_traj.get_scaled(self.lag))
@@ -301,3 +306,4 @@ class MaximumLikelihoodMSM(_MSMEstimator):
         Ceff = submatrix(Ceff_full, self.active_set)
         return Ceff
         # return self._C_active / float(self.lag)
+
