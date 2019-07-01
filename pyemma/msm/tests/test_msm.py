@@ -27,6 +27,7 @@ r"""Unit test for the MSM module
 import unittest
 
 import numpy as np
+import pyemma
 import scipy.sparse
 import warnings
 
@@ -222,7 +223,7 @@ class TestMSMDoubleWell(unittest.TestCase):
         # NONREVERSIBLE
         assert self.msmrev.is_reversible
         assert self.msmrevpi.is_reversible
-        assert (self.msmrev_sparse.is_reversible)
+        assert self.msmrev_sparse.is_reversible
         assert self.msmrevpi_sparse.is_reversible
         # REVERSIBLE
         assert not self.msm.is_reversible
@@ -249,9 +250,9 @@ class TestMSMDoubleWell(unittest.TestCase):
 
     def _active_set(self, msm):
         # should always be <= full set
-        assert (len(msm.active_set) <= self.msm.nstates_full)
+        self.assertLessEqual(len(msm.active_set), self.msm.nstates_full)
         # should be length of nstates
-        assert (len(msm.active_set) == self.msm.nstates)
+        self.assertEqual(len(msm.active_set), self.msm.nstates)
 
     def test_active_set(self):
         self._active_set(self.msmrev)
@@ -767,7 +768,7 @@ class TestMSMDoubleWell(unittest.TestCase):
     def _expectation(self, msm):
         e = msm.expectation(list(range(msm.nstates)))
         # approximately equal for both
-        assert (np.abs(e - 31.73) < 0.01)
+        self.assertLess(np.abs(e - 31.73), 0.01)
 
     def test_expectation(self):
         self._expectation(self.msmrev)
@@ -824,7 +825,7 @@ class TestMSMDoubleWell(unittest.TestCase):
         # should relax
         assert (len(times) == maxtime / msm.lagtime)
         assert (len(rel2) == maxtime / msm.lagtime)
-        assert (rel2[0] < rel2[-1])
+        self.assertLess(rel2[0], rel2[-1], msm)
 
     def test_relaxation(self):
         self._relaxation(self.msmrev)
@@ -979,7 +980,7 @@ class TestMSMDoubleWell(unittest.TestCase):
             assert (np.all(samples.shape == (nsample, 2)))
             for row in samples:
                 assert (row[0] == 0)  # right trajectory
-                assert (dtraj_active[row[1]] == i)
+                self.assertEqual(dtraj_active[row[1]], i)
 
     def test_sample_by_state(self):
         self._sample_by_state(self.msmrev)
@@ -1034,7 +1035,7 @@ class TestMSMDoubleWell(unittest.TestCase):
         # therefore underestimate rates
         ksum = 1.0 / t12 + 1.0 / t21
         k2 = 1.0 / t2
-        assert (np.abs(k2 - ksum) < eps)
+        self.assertLess(np.abs(k2 - ksum), eps)
 
     def test_two_state_kinetics(self):
         self._two_state_kinetics(self.msmrev)
@@ -1092,6 +1093,107 @@ IndexError: index 0 is out of bounds for axis 1 with size 0
         from pyemma.msm import timescales_msm
         its = timescales_msm(self.dtraj, lags=[1, 2], mincount_connectivity=0, errors=None)
         assert its.estimator.mincount_connectivity == 0
+
+
+class TestCoreMSM(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from pyemma import datasets
+        cls.dtraj = datasets.load_2well_discrete().dtraj_T100K_dt10
+
+    def test_core(self):
+        core_set = [15, 16, 17, 45, 46, 47]
+        msm = pyemma.msm.estimate_markov_model(self.dtraj, lag=1, core_set=core_set)
+        np.testing.assert_equal(msm.core_set, core_set)
+
+        self.assertEqual(msm.n_cores, len(core_set))
+        # check we only have core set states in the stored discrete trajectories.
+        for d in msm.dtrajs_full:
+            uniq = np.unique(d)
+            assert len(np.setdiff1d(uniq, core_set)) == 0
+
+    def test_indices_remapping(self):
+        dtrajs = [[5, 5, 1, 0, 0, 1], [5, 1, 0, 1, 3], [0, 1, 2, 3]]
+        desired_offsets = [2, 1, 0]
+        msm = pyemma.msm.estimate_markov_model(dtrajs, lag=1, core_set=[0, 1, 2, 3])
+        np.testing.assert_equal(msm.dtrajs_milestone_counting_offsets, desired_offsets)
+
+        # sampling
+        from pyemma.util.contexts import numpy_random_seed
+        with numpy_random_seed(10):
+            samples_states = msm.sample_by_state(1)
+            #syn_traj = msm.generate_traj(N=20)
+        # the first trajectory is shifted by two frames. Third remains constant.
+        np.testing.assert_equal(samples_states[0], [[0, 4]])
+        np.testing.assert_equal(samples_states[1], [[2, 1]])
+
+        msm.pcca(2)
+        samples = msm.sample_by_distributions(msm.metastable_distributions, 3)
+
+    def test_compare2hmm(self):
+        """test if estimated core set MSM is comparable to 2-state HMM; double-well"""
+
+        cmsm = pyemma.msm.estimate_markov_model(self.dtraj, lag=5, core_set=[34, 65])
+        hmm = pyemma.msm.estimate_hidden_markov_model(self.dtraj, nstates=2, lag=5)
+
+        np.testing.assert_allclose(hmm.transition_matrix, cmsm.transition_matrix, rtol=.1, atol=1e-3)
+        np.testing.assert_allclose(hmm.timescales()[0], cmsm.timescales()[0], rtol=.1)
+        np.testing.assert_allclose(hmm.mfpt([0], [1]), cmsm.mfpt([0], [1]), rtol=.1)
+
+    def test_compare2hmm_bayes(self):
+        """test core set MSM with Bayesian sampling, compare ITS to 2-state BHMM; double-well"""
+
+        cmsm = pyemma.msm.bayesian_markov_model(self.dtraj, lag=5, core_set=[34, 65], nsamples=20, count_mode='sliding')
+        hmm = pyemma.msm.bayesian_hidden_markov_model(self.dtraj, 2, lag=5, nsamples=20)
+
+        has_overlap = not (np.all(cmsm.sample_conf('timescales') < hmm.sample_conf('timescales')[0]) or
+                           np.all(cmsm.sample_conf('timescales') > hmm.sample_conf('timescales')[1]))
+
+        self.assertTrue(has_overlap, msg='Bayesian distributions of HMM and CMSM implied timescales have no overlap.')
+
+    def test_last_core_counting(self):
+
+        n_states = 30
+        n_traj = 10
+        n_cores = 15
+        dtrajs = [np.random.randint(0, n_states, size=1000) for _ in range(n_traj)]
+        core_set = np.random.choice(np.arange(0, n_states), size=n_cores, replace=False)
+        assert np.unique(core_set).size == n_cores
+
+        cmsm = pyemma.msm.estimate_markov_model(dtrajs, lag=1, core_set=core_set, count_mode='sample', reversible=False)
+
+        def naive(dtrajs, core_set):
+            import copy
+            dtrajs = copy.deepcopy(dtrajs)
+            nstates = np.concatenate(dtrajs).max() + 1
+            cmat = np.zeros((nstates, nstates))
+            newdiscretetraj = []
+            for t, st in enumerate(dtrajs):
+                oldmicro = None
+                newtraj = []
+                for f, micro in enumerate(st):
+                    newmicro = None
+                    for co in core_set:
+                        if micro == co:
+                            newmicro = micro
+                            oldmicro = micro
+                            break
+                    if newmicro is None and oldmicro is not None:
+                        newtraj.append(oldmicro)
+                    elif newmicro is not None:
+                        newtraj.append(newmicro)
+                newdiscretetraj.append(np.array(newtraj, dtype=int))
+
+            for d in newdiscretetraj:
+                for oldmicro, newmicro in zip(d[:-1], d[1:]):
+                    cmat[oldmicro, newmicro] += 1
+
+            return newdiscretetraj, cmat
+
+        expected_dtraj, expected_cmat = naive(dtrajs, core_set)
+        print(cmsm.active_set, cmsm.nstates_full)
+        np.testing.assert_equal(cmsm.dtrajs_full, expected_dtraj)
+        np.testing.assert_equal(cmsm.count_matrix_full, expected_cmat)
 
 if __name__ == "__main__":
     unittest.main()
