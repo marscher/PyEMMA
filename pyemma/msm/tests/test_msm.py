@@ -1016,7 +1016,6 @@ class TestMSMDoubleWell(unittest.TestCase):
     # ----------------------------------
     # MORE COMPLEX TESTS / SANITY CHECKS
     # ----------------------------------
-
     def _two_state_kinetics(self, msm, eps=0.001):
         if msm.is_sparse:
             k = 4

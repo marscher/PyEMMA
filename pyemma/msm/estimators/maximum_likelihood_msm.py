@@ -1,4 +1,3 @@
-
 # This file is part of PyEMMA.
 #
 # Copyright (c) 2015, 2014 Computational Molecular Biology Group, Freie Universitaet Berlin (GER)
@@ -17,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as _np
-import warnings as _warnings
 from msmtools import estimation as msmest
 
 from pyemma.msm.estimators._msm_estimator_base import _MSMEstimator
@@ -329,4 +327,3 @@ class MaximumLikelihoodMSM(_MSMEstimator):
         Ceff = submatrix(Ceff_full, self.active_set)
         return Ceff
         # return self._C_active / float(self.lag)
-
